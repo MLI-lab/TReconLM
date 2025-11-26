@@ -1,0 +1,17 @@
+defaults:
+  - base
+
+finetune_data_type: microsoft_data
+finetune_target_type: CPRED
+finetune_observation_size: 10
+finetune_lower_bound_obs_size: 2
+finetune_ground_truth_length: 110
+finetune_sequence_type: nuc
+finetune_experiment: 'mic_scratch'
+
+data_folder: <your.storage.path>/data/microsoft/ # full path to where data is located
+
+finetune_filename_train: 'train.txt'
+finetune_filename_val: 'val.txt'
+
+model_dir : None

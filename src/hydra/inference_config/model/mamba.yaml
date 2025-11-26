@@ -1,0 +1,10 @@
+# conf/model/mamba.yaml
+# ------------------------------------------------------------------
+model_type: mamba          # used by init_model() / load_model()
+
+mamba_params:              
+  n_layer:          4      # depth
+  d_model:          384    # hidden size
+  d_intermediate:   1536   # 4 times expansion (common default)
+  rms_norm:         true   # boolean flags from MambaConfig
+  residual_in_fp32: false

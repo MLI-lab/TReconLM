@@ -1,0 +1,21 @@
+hydra:
+  run:
+    # before main(cfg) called switch working dir to this path (default is ./outputs/…)
+    dir: ../model_checkpoints/${project}/${general.run_dir}
+    
+defaults:
+  - _self_
+  - general: base
+  - model: null
+  - data: null
+  - train: null
+  - finetune: null
+  - exps: null
+
+project: 'TEST'
+experiment: 'test' 
+  
+wandb: 
+  wandb_log: true
+  wandb_project: ${project}
+  wandb_entity: <your.wandb.entity>

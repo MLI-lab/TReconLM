@@ -1,0 +1,60 @@
+# @package _global_
+
+defaults:
+  - override /general: scratch 
+  - override /model: gpt
+  - override /train: base
+  - override /finetune: noisy_scratch
+
+
+project: TRACE_RECONSTRUCTION
+experiment: noisy_scratch
+
+general:
+  checkpoint_path: <your.storage.path> # where checkpoint should be saved
+  #train_time: '20250504_110628' # train time is either pretrain checkpoint or from finetuning if we resume not scratch
+
+data:
+  data_type: ids_data
+  sequence_type: nuc
+  observation_size: 10
+  target_type: CPRED 
+  ground_truth_length: 60
+  lower_bound_obs_size: 2
+  block_size: 800
+  train_seed : 100
+
+train:
+  ddp: false
+  eval_interval: 1000
+  log_interval: 10
+  eval_iters: 250
+  eval_only: false
+  always_interval: 500
+  always_save_checkpoint: true
+  device: cuda:0
+  gradient_accumulation_steps: 16
+  batch_size: 50
+  learning_rate: 7e-4
+  max_epochs: 10000000
+  max_iters: 688318  
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  decay_lr: true
+  warmup_iters: 0 # placeholder set to 1% of max_iters in finetune script
+  min_lr: 0.0
+  lr_decay_iters: ${train.max_iters} 
+  #patience: 1000
+
+model:
+  gpt_params: 
+    n_layer: 12
+    n_head: 8
+    n_embd: 512
+    dropout: 0
+    bias: false
+
+wandb: 
+  wandb_log: true

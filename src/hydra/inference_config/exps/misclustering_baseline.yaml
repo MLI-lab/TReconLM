@@ -1,0 +1,36 @@
+# @package _global_
+
+# Configuration for running inference on the SAME examples that had contamination
+# in the misclustering experiment (for fair comparison)
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'Misclustering'
+experiment: misclustering_baseline_over_contaminated_examples
+
+# Standard inference configuration
+data:
+  artifact_name: "test_dataset_seed34721_gl110_bs1500_ds50000"
+  ground_truth_length: 110 
+  batch_size: 50
+  block_size: 1500
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 50000
+
+  # Path to indices file created by misclustering experiment
+  # This ensures we only evaluate on examples that had contamination
+  subset_indices_path: "<your.storage.path>/contaminated_example_indices_trained.json"
+
+model:
+  checkpoint_path: <your.storage.path>/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt110_compute_final_110nt_reproduce_seed42/final_110nt_reproduce_seed42/train_run_gpt_20250829_105702/checkpoint_best.pt
+  sampling:
+    strategy: "greedy"
+    temperature: 1.0
+    top_k: None
+
+
+# NOTE: No misclustering_robustness section runs normal inference
+# on the subset of examples that had contamination in the misclustering experiment

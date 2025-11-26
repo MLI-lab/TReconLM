@@ -1,0 +1,10 @@
+# conf/model/mamba.yaml
+# ------------------------------------------------------------------
+model_type: mamba          # used by init_model() / load_model()
+
+mamba_params:              # every field is read in pretrain.py
+  n_layer:          4      # ← depth, same as your tiny GPT
+  d_model:          384    # ← hidden size, matches GPT n_embd
+  d_intermediate:   1536   # ← 4× expansion (common default)
+  rms_norm:         true   # boolean flags from MambaConfig
+  residual_in_fp32: false

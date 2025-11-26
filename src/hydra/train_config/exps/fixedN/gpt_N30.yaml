@@ -1,0 +1,61 @@
+# @package _global_
+
+defaults:
+  - override /general: scratch  
+  - override /data: ids_data
+  - override /model: gpt
+  - override /train: base
+
+project: TRACE_RECONSTRUCTION
+experiment: fixed_N30
+
+general:
+  checkpoint_path: #'your_path'
+  #train_time: '' # to resume from run 
+  
+
+
+data:
+  sequence_type: nuc
+  target_type: CPRED 
+  observation_size: 30
+  ground_truth_length: 110
+  lower_bound_obs_size: 30
+  block_size: 4500 
+  test: true
+  test_seed: 34721
+  test_dataset_size: 50000
+
+train:
+  ddp: true
+  eval_interval: 500
+  log_interval: 10
+  eval_iters: 1000
+  eval_only: false
+  always_interval: 500
+  always_save_checkpoint: true
+  device: cuda:0
+  gradient_accumulation_steps: 16 
+  batch_size: 16
+  learning_rate: 0.0001
+  max_iters: 383260 
+  weight_decay: 0.1 
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  decay_lr: true
+  warmup_iters: 5000 #placeholder set to 5% of max_iters in train()
+  min_lr: 0.0
+  lr_decay_iters: ${train.max_iters} 
+  train_seed: 100
+
+model:
+  gpt_params: 
+    n_layer: 12
+    n_head: 8
+    n_embd: 512
+    dropout: 0.2
+    bias: false
+
+wandb: 
+  wandb_log: true

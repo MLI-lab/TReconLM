@@ -1,0 +1,60 @@
+# @package _global_
+
+defaults:
+  - override /general: resume  
+  - override /data: ids_data
+  - override /model: gpt
+  - override /train: base
+
+project: Reproduce
+experiment: final_110nt_reproduce_seed1
+
+general:
+  checkpoint_path: <your.storage.path> # path checkpoints should be saved to
+  train_time: '20250828_200058' # to resume from checkpoint
+
+data:
+  sequence_type: nuc
+  target_type: CPRED 
+  observation_size: 10
+  ground_truth_length: 110
+  lower_bound_obs_size: 2
+  block_size: 1500 
+  test: true
+  test_seed: 34721
+  test_dataset_size: 50000
+
+train:
+  ddp: true
+  eval_interval: 500
+  log_interval: 10
+  eval_iters: 1000
+  eval_only: false
+  always_interval: 500
+  always_save_checkpoint: true
+  device: cuda:0
+  gradient_accumulation_steps: 16 
+  batch_size: 50
+  learning_rate: 0.0007071067811865476
+  max_iters: 367103 # 1e20 compute
+  weight_decay: 0.1 
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  decay_lr: true
+  warmup_iters: 0 #placeholder set to 5% of max_iters in train()
+  min_lr: 0.0
+  lr_decay_iters: ${train.max_iters}
+  train_seed: 1
+
+model:
+  gpt_params: 
+    n_layer: 12
+    n_head: 8
+    n_embd: 512
+    dropout: 0
+    bias: false
+
+wandb: 
+  wandb_log: true
+  test_project: TRACE_RECONSTRUCTION

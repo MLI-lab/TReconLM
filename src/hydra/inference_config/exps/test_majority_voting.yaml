@@ -1,0 +1,36 @@
+# @package _global_
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'MajorityVotingTest'
+experiment: 'test_majority_voting_60nt'
+
+data:
+  artifact_name: test_dataset_seed34721_gl60_bs800_ds50000
+  ground_truth_length: 60
+  block_size: 800
+  batch_size: 10  # Small batch for testing
+  test_seed: 34721
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 50000
+
+model:
+  checkpoint_path: "<your.storage.path>/model_checkpoints/VariableLength/ids_data_nuc_CPRED_obs10_gt[50, 120]_compute_var_length_50_120/var_length_50_120/train_run_gpt_20251006_122436/checkpoint_best.pt"
+
+  sampling:
+    temperature: 1.0
+    top_k: None
+    strategy: greedy
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: False
+    max_samples: 100  # Test with only 100 examples
+
+    # Enable majority voting ensemble
+    majority_voting:
+      enabled: true
+      max_permutations: 10
+      seed: 42
+      tie_breaking_strategy: "random"  # "random" or "first_prediction"

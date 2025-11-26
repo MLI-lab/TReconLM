@@ -1,0 +1,19 @@
+defaults:
+  - base
+
+data_type: ids_data
+data_project: TRACE_RECONSTRUCTION
+artifact_name: ???
+
+target_type: CPRED # CPRED, std_MSA, ext_MSA, std_NESTED, ext_NESTED
+ground_truth_length: 110
+block_size: 1500 # this will also be the context lenght of the GPT model
+batch_size: 800
+
+substitution_probability_lb: 0.01
+insertion_probability_lb: 0.01
+deletion_probability_lb: 0.01
+
+substitution_probability_ub: 0.1
+insertion_probability_ub: 0.1
+deletion_probability_ub:  0.1

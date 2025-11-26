@@ -1,0 +1,12 @@
+100
+Total number of clusters: 1
+Edit distance hist:
+0	1
+Substitution rate:	0
+Deletion rate:	0
+Insertion rate:	0
+Error rate:	0
+Success rate:	1
+
+
+Time taken by function: 1630 microseconds

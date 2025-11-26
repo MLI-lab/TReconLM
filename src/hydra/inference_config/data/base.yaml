@@ -1,0 +1,5 @@
+data_type: ids_data
+
+sequence_type: nuc
+
+observation_size: 10

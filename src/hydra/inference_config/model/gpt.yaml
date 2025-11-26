@@ -1,0 +1,17 @@
+model_type: gpt
+
+checkpoint_path: ???
+
+sampling:
+  temperature: 1
+  top_k: None
+  max_new_tokens: 110
+  strategy: greedy # greedy, beam_search
+
+  # Majority voting ensemble (permutation-based inference)
+  majority_voting:
+    enabled: false
+    max_permutations: 10  # Max permutations (actual = min(max_permutations, N!))
+    seed: 42  # For reproducible permutation generation
+    tie_breaking_strategy: "random"  # "random" or "first_prediction" - how to break ties in voting
+

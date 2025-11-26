@@ -1,0 +1,11 @@
+
+
+finetune_data_type: ???
+finetune_target_type: CPRED
+finetune_observation_size: ???
+finetune_lower_bound_obs_size: ???
+finetune_ground_truth_length: ???
+finetune_sequence_type: nuc
+finetune_experiment: ???
+
+data_folder: ???

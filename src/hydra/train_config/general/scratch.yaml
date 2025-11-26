@@ -1,0 +1,9 @@
+defaults:
+ - base
+
+init_from: scratch
+now_str: ${now:%Y%m%d_%H%M%S}
+
+run_dir: ${data.data_type}_${data.sequence_type}_${data.target_type}_observation_size_${data.observation_size}_ground_truth_${data.ground_truth_length}/${experiment}/train_run_${model.model_type}_${general.now_str}/hydra_scratch/
+
+

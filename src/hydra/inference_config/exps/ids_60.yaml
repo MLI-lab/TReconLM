@@ -1,0 +1,35 @@
+# @package _global_
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'TrackAttention'
+experiment: 'track_attention_60nt' 
+
+data: 
+  artifact_name: test_dataset_seed34721_gl60_bs800_ds50000
+  ground_truth_length: 60 
+  block_size: 800
+  batch_size: 20
+  test_seed: 34721
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 50000
+
+
+model:
+  #checkpoint_path: <your.storage.path>/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt60_compute_final_60nt_reproduce_seed1/final_60nt_reproduce_seed1/train_run_gpt_20250805_002145/checkpoint_best.pt
+  checkpoint_path: "/workspaces/TReconLM/tutorial/models/models--mli-lab--TReconLM/snapshots/950d152df4daab579e7ef6e65cfb6566b9c392a9/model_seq_len_60.pt"
+  sampling:
+    temperature: 1.0
+    top_k: None
+    strategy: greedy      # greedy or beam_search
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: False # to just generate ACTG
+    track_attention: true
+    track_all_layers: true
+    save_per_head_attention: true
+    attention_output_dir: "<your.data.path>/TReconLM/attention_results/synthetic_L60/all_layers_shuffeled" # Relative - creates under current working directory
+    max_samples: 500
+    permute_traces: true  # If true, randomly permute the order of traces/reads before inference to test for positional bias

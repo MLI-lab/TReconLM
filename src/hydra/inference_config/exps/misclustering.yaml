@@ -1,0 +1,64 @@
+# @package _global_
+
+# Example configuration for misclustering robustness analysis
+# This config demonstrates how to enable and configure the misclustering experiment
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'Misclustering'
+experiment: miscluster
+
+# Standard inference configuration
+data:
+  artifact_name: "test_dataset_seed34721_gl110_bs1500_ds50000"
+  batch_size: 50
+  block_size: 1500
+  ground_truth_length: 110
+  target_type: "CPRED"
+  sequence_type: "nuc"
+
+model:
+  checkpoint_path: <your.storage.path>/model_checkpoints/Misclustering/ids_data_nuc_CPRED_obs10_gt110_compute_final_110nt_reproduce/final_110nt_reproduce/train_run_gpt_20250929_200504/checkpoint_best.pt
+  #checkpoint_path: <your.storage.path>/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt110_compute_final_110nt_reproduce_seed42/final_110nt_reproduce_seed42/train_run_gpt_20250829_105702/checkpoint_best.pt
+  sampling:
+    strategy: "greedy"
+    temperature: 1.0
+    top_k: None
+    track_attention: true  # Enable attention tracking
+    contaminated_attention_output_dir: "<your.storage.path>/Contaminated_Attention_output/trained_misclustering"  # Contaminated attention files
+    # For baseline (no misclustering) attention, used by run_baseline_on_subset
+    #attention_output_dir: "<your.storage.path>/attention_results/synthetic_L110" # If set relative, creates under current working directory
+
+
+
+# Misclustering robustness experiment configuration
+misclustering_robustness:
+  # Enable the experiment
+  enabled: true
+
+  # Random seed for reproducible contamination
+  seed: 365
+
+  # Maximum number of examples to use in experiment (for reasonable runtime)
+  #max_samples: 5000  # Set to -1 to use all available samples
+
+  cluster_size_filter: 3 # Filter by cluster size e.g. 3 or [3, 4, 5] 
+
+  # Contamination rates to test (fraction of traces to replace)
+  contamination_rates: [0.02] # defaults to [0.02, 0.05, 0.08, 0.1, 0.12, 0.15, 0.18, 0.2]
+
+  run_baseline_on_subset: false  # If true, also run normal inference on the subset of examples that had contamination to compare attention maps
+
+  # Path to save indices of examples that had contamination (for fair comparison)
+  #contaminated_indices_save_path: "<your.storage.path>/contaminated_example_indices_untrained.json"
+
+  # Post-hoc analysis configuration
+  # Number of bins to group realized edit distance multipliers for analysis
+  multiplier_bins: 10
+
+  # Note: Edit distance multipliers are no longer pre-defined
+  # Instead, contaminants are generated naturally using the same IDS channel as training
+  # Realized edit distance multipliers are recorded and grouped into bins for analysis
+

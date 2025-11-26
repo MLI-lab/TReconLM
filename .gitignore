@@ -1,0 +1,74 @@
+# ----------------------------- Data folders -----------------------------
+/data/noisy_dna/data/
+/data/noisy_dna/noisy_dna_data_storage/
+/data/microsoft_data/data/
+/data/microsoft_data/data_microsoft/
+/data/microsoft_data/clustered-nanopore-reads-dataset/
+/data/microsoft_data/reclustered_microsoft/
+/data/pretraining_data/
+/data/organick/
+/data/grass_2015/*.txt
+/data/grass_2015/*.pkl
+/data/grass_2015/splits_grass/
+
+# -------------------------- Checkpoints folder --------------------------
+/model_checkpoints/
+
+# -------------------------- Test results folder -------------------------
+/TEST_RESULTS/
+
+# ---------------------- Common experiment folders -----------------------
+wandb/
+logs/
+**/wandb/
+**/logs/
+**/exclude_git/
+**/downloaded_artifact/
+**/downloaded_artifact_openai/
+CLAUDE.md
+models/
+tutorial/data/
+tutorial/models/
+tutorial/results/
+
+# ------------------------- PyCache and temp dirs ------------------------
+__pycache__/
+**/__pycache__/
+**/artifacts/# experiment artifacts
+artifacts/
+DeepLearningBaselines/RobuSeqNet/examples/artifacts/
+
+# (optional) if you only want to ignore large tensors inside artifacts:
+# artifacts/**/*.pt
+# DeepLearningBaselines/RobuSeqNet/examples/artifacts/**/*.pt
+artifacts/
+DeepLearningBaselines/RobuSeqNet/examples/artifacts/
+artifacts/
+DeepLearningBaselines/DNAFormer/artifacts/
+DeepLearningBaselines/RobuSeqNet/examples/artifacts/
+*.out
+*.err
+*.log
+
+# --------------------------- All dot files/dirs -------------------------
+.*
+!.gitignore
+
+# --------------------------- Parquet data files -------------------------
+*.parquet
+
+# --------------------------- Meiser data files --------------------------
+data/meiser/
+data/grass_2015/
+
+# --------------------------- Chandak data files --------------------------
+data/chandak/clustered_data_edit_dist_0/
+data/chandak/processed_data/
+data/chandak/dataset_stats.json
+data/chandak/ground_truth.txt
+data/chandak/reads.txt
+data/chandak/test_x.pt
+data/chandak/test_y.pt
+data/chandak/train.txt
+data/chandak/test.txt
+data/chandak/val.txt

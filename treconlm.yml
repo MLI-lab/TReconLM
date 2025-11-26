@@ -1,0 +1,53 @@
+name: treconlm
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  # PyTorch with CUDA support
+  # NOTE: Driver 465.19.01 supports CUDA 11.3, but PyTorch 2.0+ requires CUDA 11.7+
+  # Solution: Install PyTorch with CUDA 11.7 (forward compatible with CUDA 11.3 driver)
+  - cudatoolkit=11.3
+  - tensorboard
+  - pytest
+  - scipy
+  - imageio
+  - pip
+  - pip:
+    # PyTorch - use extra-index-url so other packages can still use PyPI
+    - --extra-index-url https://download.pytorch.org/whl/cu117
+    - torch==2.0.1+cu117
+    - torchvision==0.15.2+cu117
+    # Pin versions for reproducibility and compatibility
+    - numpy<2.0  # numpy 2.x has GLIBC compatibility issues
+    - pillow<11  # pillow 11+ has GLIBC compatibility issues
+    - ipykernel
+    - ipywidgets
+    - tiktoken
+    - matplotlib
+    - tqdm
+    - wandb
+    - pyyaml
+    - pandas
+    - timm==0.9.16  # Pin timm to avoid torch version upgrade
+    - memory_profiler
+    - hydra-core
+    - pytz
+    - Levenshtein
+    - scikit-learn
+    - huggingface_hub
+    - datasets
+    - tabulate
+    - seaborn
+    - bitsandbytes==0.41.0  # Last version compatible with torch 2.0.x
+    - biopython
+
+ # apt install build-essential
+
+
+ # FOR PLOTTING 
+ # apt-get install cm-super
+ # apt-get install texlive-fonts-recommended
+ # apt-get install texlive-full 

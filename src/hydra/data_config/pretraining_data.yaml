@@ -1,0 +1,33 @@
+# @package _global_
+
+data_type: 'ids_data'
+
+seed_number: 34721
+
+target_type: 'CPRED' # std_MSA, CPRED, ext_MSA, std_NESTED, ext_NESTED
+sequence_type: 'nuc'
+data_set_size: 50_000
+observation_size: 10
+observation_size_lb: 2
+ground_truth_length: 110
+
+sweep: false
+
+save_flag: false
+
+lower_noise_bound: 0.01
+upper_noise_bound: 0.1
+
+insertion_probability_lb: ${lower_noise_bound}
+insertion_probability_ub: ${upper_noise_bound}
+
+deletion_probability_lb: ${lower_noise_bound}
+deletion_probability_ub: ${upper_noise_bound}
+
+substitution_probability_lb: ${lower_noise_bound}
+substitution_probability_ub: ${upper_noise_bound}
+
+group_name: ${data_type}_observation_size_${observation_size}_ground_truth_${ground_truth_length}
+noise_name: ${data_type}
+
+folder_name: pretraining_test_data/seed_num_${seed_number}/${group_name}/${noise_name}/${target_type}

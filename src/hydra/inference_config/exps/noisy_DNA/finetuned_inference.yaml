@@ -1,0 +1,38 @@
+# @package _global_
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'FinetuneNoisyDNA'
+experiment: 'finetune_noisy_default_padded' 
+
+data: 
+  artifact_name: File1-test-20250803_151659
+  ground_truth_length: 60 
+  block_size: 800
+  batch_size: 20
+  test_seed: 34721
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 50000
+
+model: 
+  #checkpoint_path: <your.storage.path>/model_checkpoints/FinetuneNoisyDNA/noisy_data_nuc_CPRED_observation_size_10_ground_truth_60/finetune_noisy_ratio_full/train_run_gpt_20250916_103654/checkpoint_best.pt
+  checkpoint_path: <your.storage.path>/model_checkpoints/FinetuneNoisyDNA/noisy_data_nuc_CPRED_observation_size_10_ground_truth_60/finetune_noisy_padded110/train_run_gpt_20250917_112617/checkpoint_best.pt
+
+  sampling:
+    temperature: 1.0
+    top_k: None
+    strategy: greedy      # or “beam_search”
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: False
+    # Attention tracking parameters
+    track_attention: false
+    attention_output_dir: "<your.storage.path>/attention_results/finetune_noisy_eval_noisy" # Relative - creates under current working directory
+    # Entropy tracking parameters
+    track_entropy: false
+    entropy_analysis: false
+    log_entropy_details: false  # Set to true for per-example entropy logging
+    save_sequences: true  # Set to true to save GT and predictions for failure analysis
+    sequence_output_file: "<your.storage.path>/pred_gt/finetune_noisy/predictions_output.tsv"  # File to save sequences

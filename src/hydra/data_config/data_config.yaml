@@ -1,0 +1,30 @@
+hydra:
+  run:
+    dir: data/${folder_name}
+  sweep:
+    dir: data/pretraining_data/seed_num_${seed_number}/${folder_name}
+
+project: TRACE_RECONSTRUCTION
+experiment: ~
+
+defaults:
+  - _self_
+  - pretraining_data 
+
+data_type: ids_data
+target_type: 'CPRED' # std_MSA, CPRED, ext_MSA, std_NESTED, ext_NESTED
+block_size: 1500
+sequence_type: 'nuc'
+data_set_size: 50_000
+observation_size: 10
+observation_size_lb: 2
+ground_truth_length: 110
+save_flag: false  
+
+
+seed_number: 34721  # for reproducibility
+
+wandb: 
+  wandb_log: true
+  wandb_project: ${project}
+  wandb_entity: # set your wandb entity here

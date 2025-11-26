@@ -1,0 +1,37 @@
+# @package _global_
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'CrossDomain'
+experiment: 'finetune_mic_eval_noisy' 
+
+data: 
+  artifact_name: File1-test-20250803_151659  #File1-CrossTest-test-20250728_152814
+  ground_truth_length: 60 
+  block_size: 1500
+  batch_size: 20
+  test_seed: 34721
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 5000
+  cross: null  # Options: null, 'noisy', 'microsoft'
+
+
+
+model: 
+  checkpoint_path: <your.storage.path>/model_checkpoints/FinetuneMicrosoft/microsoft_data_nuc_CPRED_observation_size_10_ground_truth_110/finetune_microsoft_seed1/train_run_gpt_20250918_210827/checkpoint_best.pt
+  sampling:
+    temperature: 1.0
+    top_k: None
+    strategy: greedy      # or “beam_search”
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: False
+    # Attention tracking parameters
+    track_attention: true
+    attention_output_dir: "<your.storage.path>/attention_results/finetune_mic_eval_noisy" # Relative - creates under current working directory
+    # Entropy tracking parameters
+    track_entropy: false
+    entropy_analysis: false
+    log_entropy_details: false  # Set to true for per-example entropy logging

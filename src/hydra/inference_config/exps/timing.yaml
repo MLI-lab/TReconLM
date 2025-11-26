@@ -1,0 +1,42 @@
+# @package _global_
+
+defaults:
+  - override /data:  ids_data
+  - override /model: gpt
+
+project: 'TimingCost'
+experiment: 'timing_batched' #'TreconLM_pretrained_ids110_reproducibility' 
+
+
+data: 
+  artifact_name: test_dataset_seed34721_gl110_bs1500_ds50000
+  ground_truth_length: 110 
+  block_size: 1500
+  batch_size: 400 
+  test_seed: 34721
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 50000
+
+
+model: 
+  checkpoint_path: <your.storage.path>/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt110_compute_final_110nt_reproduce_seed42/final_110nt_reproduce_seed42/train_run_gpt_20250829_105702/checkpoint_best.pt
+  compile: true  # Enable torch.compile for 30-200% speedup (requires PyTorch 2.0+)
+  compile_mode: reduce-overhead  # Options: default, reduce-overhead, max-autotune
+
+  sampling:
+    temperature: 1.0
+    top_k: None
+    strategy: greedy      # greedy or beam_search, if beam_search, set beam_width below
+    #beam_width: 6
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: False # to just generate ACTG 
+
+
+
+timing:
+  enabled: true  # Set to true to enable throughput measurement mode
+  run_duration: 300  # Duration of each run in seconds (900s = 15 minutes)
+  num_runs: 6  # Total number of runs (including warmup)
+  warmup_runs: 1  # Number of initial runs to discard (for GPU warmup)
+  log_interval: 100  # Log progress every N examples during timing

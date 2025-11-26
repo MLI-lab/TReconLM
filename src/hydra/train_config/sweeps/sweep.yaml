@@ -1,0 +1,30 @@
+program: src/finetune.py
+command:
+  - ${env}
+  - python
+  - src/finetune.py
+  - exps=microsoft/mic
+
+method: bayes # grid
+metric:
+  name: val/loss
+  goal: minimize
+
+parameters:
+  train.learning_rate:
+    values: [7e-6, 1e-5, 3e-5, 7e-5, 1e-4, 3e-4, 5e-4, 7e-4]
+
+  train.weight_decay:
+    values: [0.0, 1e-4, 1e-3, 0.1]
+
+  model.gpt_params.dropout:
+    values: [0.0, 0.1, 0.2, 0.3]
+
+  batch_config:
+    values:
+      - { batch_size: 16, gradient_accumulation_steps: 1, max_iters: 1827485 }
+      - { batch_size: 32, gradient_accumulation_steps: 1, max_iters: 913742 }
+      - { batch_size: 52, gradient_accumulation_steps: 1, max_iters: 562303 }
+      - { batch_size: 36, gradient_accumulation_steps: 2, max_iters: 406107 }
+      - { batch_size: 46, gradient_accumulation_steps: 2, max_iters: 317823 }
+      - { batch_size: 64, gradient_accumulation_steps: 2, max_iters: 228435 }

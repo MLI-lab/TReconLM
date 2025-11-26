@@ -1,0 +1,28 @@
+# @package _global_
+
+defaults:
+  - override /data:  ids_data
+  - override /model: lstm
+
+project: 'LSTM'
+experiment: 'lstm' #'TreconLM_pretrained_ids110_reproducibility' 
+
+data: 
+  artifact_name: test_dataset_seed34721_gl110_bs1500_ds50000
+  ground_truth_length: 110 
+  block_size: 1500
+  batch_size: 200 
+  test_seed: 34721
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 50000
+
+
+model: 
+  checkpoint_path: <your.storage.path>/model_checkpoints/TRACE_RECONSTRUCTION/ids_data_nuc_CPRED_obs10_gt110_compute_lstm_J/lstm_J/train_run_lstm_20250729_174856/checkpoint_best.pt
+  sampling:
+    temperature: 1.0
+    top_k: None
+    strategy: greedy      # greedy or beam_search
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: False # to just generate ACTG 

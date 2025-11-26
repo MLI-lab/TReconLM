@@ -1,0 +1,17 @@
+defaults:
+  - base
+
+data_type: ids_data
+
+target_type: CPRED # CPRED, std_MSA, ext_MSA, std_NESTED, ext_NESTED
+ground_truth_length: 110
+lower_bound_obs_size: 2 # int
+block_size: 1500 # this will also be the context lenght of the GPT model
+
+substitution_probability_lb: 0.01
+insertion_probability_lb: 0.0
+deletion_probability_lb: 0.0
+
+substitution_probability_ub: 0.1
+insertion_probability_ub: 0.0
+deletion_probability_ub:  0.0

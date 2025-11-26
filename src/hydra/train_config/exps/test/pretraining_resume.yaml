@@ -1,0 +1,56 @@
+# @package _global_
+
+# python pretrain.py exps=test/pretraining_resume
+
+defaults:
+  - override /general: resume
+  - override /data: ids_data
+  - override /model: gpt
+  - override /train: base
+
+project: TRACE_RECONSTRUCTION
+experiment: pretraining_test
+
+general:
+  train_time: '20241127_175939'
+  
+data:
+  sequence_type: nuc
+  target_type: CPRED 
+  observation_size: 5
+  ground_truth_length: 60
+  lower_bound_obs_size: 2
+  block_size: 600
+
+train:
+  ddp: ~
+  eval_interval: 500
+  log_interval: 10
+  eval_iters: 1000
+  eval_only: false
+  always_interval: 600
+  always_save_checkpoint: true
+  device: cuda:0
+  gradient_accumulation_steps: 2 # must be a multiple of number of gpus you set if ddp
+  batch_size: 4
+  learning_rate: 0.0001
+  max_iters: 500000
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  decay_lr: true
+  warmup_iters: 5000
+  min_lr: 0.0
+  lr_decay_iters: ${train.max_iters} 
+
+model:
+  gpt_params:
+    n_layer: 2
+    n_head: 2
+    n_embd: 64
+    dropout: 0.2
+    bias: false
+
+wandb: 
+  wandb_log: false

@@ -1,0 +1,7 @@
+# model/lstm.yaml
+model_type: lstm        # tells init_model() which branch to use
+
+lstm_params:
+  n_layer: 2            # how many stacked LSTM layers
+  n_embd: 512           # hidden/embedding size
+  dropout: 0.1          # dropout between LSTM layers

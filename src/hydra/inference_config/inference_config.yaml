@@ -1,0 +1,32 @@
+hydra:
+  run:
+    #before call
+    dir: ${general.results_path}/model_checkpoints/${project}/
+
+defaults:
+  - _self_
+  - data: null
+  - model: null
+  - exps: null
+
+project: 'TEST'
+experiment: 'test' 
+
+general: 
+  now_str: ${now:%Y%m%d_%H%M%S}
+  results_path: <your.storage.path>
+  
+wandb:
+  wandb_log: false
+  wandb_project: ${project}
+  wandb_entity: <your.wandb.entity>
+
+# Logit margin profiling configuration
+# When enabled, computes the gap between top-1 and top-2 logits during generation
+# to analyze model confidence and explain why beam search provides minimal improvements
+profile_logit_margin:
+  enabled: false  # Set to true to enable logit margin profiling
+  num_samples: 1000  # Number of examples to subsample for profiling
+
+#additional_tags:
+#  - debug
