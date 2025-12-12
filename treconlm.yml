@@ -12,7 +12,7 @@ dependencies:
   - cudatoolkit=11.3
   - tensorboard
   - pytest
-  - scipy
+  - scipy=1.11.4
   - imageio
   - pip
   - pip:
@@ -37,6 +37,7 @@ dependencies:
     - pytz
     - Levenshtein
     - scikit-learn
+    - torchmetrics
     - huggingface_hub
     - datasets
     - tabulate

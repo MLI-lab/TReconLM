@@ -1,25 +1,34 @@
 # @package _global_
 
 # =============================================================================
-# Quick test for pretraining from scratch
-# Generates synthetic data on-the-fly (no external data needed)
-# Runs ~100 iterations with a small model
+# Test for resuming pretraining from a checkpoint
+# Continues training from a previously saved checkpoint
 #
-# Usage: python src/pretrain.py exps=test/pretrain_scratch
+# Usage: python src/pretrain.py exps=test/pretrain_resume
+#
+# You must first run pretrain_scratch.yaml to create a checkpoint,
+#       then update general.train_time below to match the checkpoint folder.
 # =============================================================================
 
 defaults:
-  - override /general: scratch     # Start from random initialization
+  - override /general: resume      # Resume from existing checkpoint
   - override /data: ids_data       # IDS channel data (insertions, deletions, substitutions)
   - override /model: gpt           # Use GPT architecture
   - override /train: base          # Base training settings
 
-# Project and experiment names (used for logging and checkpoint folders)
+# Project and experiment names (must match the original run to find checkpoint)
 project: TRACE_RECONSTRUCTION
 experiment: pretraining_test
 
+general:
+  # Timestamp of the checkpoint folder to resume from
+  # Format: YYYYMMDD_HHMMSS (found in checkpoint folder name)
+  # Example: train_run_gpt_20241127_175939 -> use '20241127_175939'
+  # UPDATE THIS after running pretrain_scratch.yaml
+  train_time: '20251212_144011'
+
 # -----------------------------------------------------------------------------
-# Data settings (synthetic data generated on-the-fly)
+# Data settings (must match original pretraining config)
 # -----------------------------------------------------------------------------
 data:
   sequence_type: nuc              # Nucleotide sequences (ACGT)
@@ -36,17 +45,17 @@ train:
   device: cuda:0                  # GPU device (DDP auto-detected via torchrun)
 
   # Iteration settings
-  max_iters: 100                  # Total training iterations (quick test)
+  max_iters: 200               # Total training iterations
   batch_size: 4                   # Examples per batch
-  gradient_accumulation_steps: 1  # Accumulate gradients (effective_batch = batch_size * this)
+  gradient_accumulation_steps: 2  # Accumulate gradients (must be multiple of GPUs if using DDP)
 
   # Evaluation settings
-  eval_interval: 50               # Evaluate every N iterations
-  eval_iters: 10                  # Batches to evaluate (synthetic data, so can use more)
+  eval_interval: 500              # Evaluate every N iterations
+  eval_iters: 1000                # Batches to evaluate
   eval_only: false                # If true, only run evaluation (no training)
 
   # Checkpointing
-  always_interval: 50             # Save checkpoint every N iterations
+  always_interval: 600            # Save checkpoint every N iterations
   always_save_checkpoint: true    # Always save (not just on improvement)
 
   # Logging
@@ -61,19 +70,19 @@ train:
 
   # Learning rate schedule
   decay_lr: true                  # Use cosine decay
-  warmup_iters: 10                # Linear warmup iterations
+  warmup_iters: 5000              # Linear warmup iterations
   min_lr: 0.0                     # Minimum learning rate
   lr_decay_iters: ${train.max_iters}  # Decay over all iterations
 
 # -----------------------------------------------------------------------------
-# Model architecture (small model for quick testing)
+# Model architecture (must match original pretraining config)
 # -----------------------------------------------------------------------------
 model:
   compile: false                  # Disabled for Python 3.11+ compatibility
   gpt_params:
-    n_layer: 2                    # Transformer layers (paper uses 12)
-    n_head: 2                     # Attention heads (paper uses 8)
-    n_embd: 64                    # Embedding dimension (paper uses 512)
+    n_layer: 2                    # Transformer layers
+    n_head: 2                     # Attention heads
+    n_embd: 64                    # Embedding dimension
     dropout: 0                    # Dropout rate
     bias: false                   # No bias in linear layers
 
@@ -81,4 +90,4 @@ model:
 # Logging
 # -----------------------------------------------------------------------------
 wandb:
-  wandb_log: false                # Disable W&B logging for quick test
+  wandb_log: false                # Disable W&B logging for testing

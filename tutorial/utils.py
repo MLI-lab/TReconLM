@@ -13,7 +13,10 @@ def load_vocabulary():
     return meta['stoi'], meta['itos']
 
 def get_model_info(sequence_length, variant='pretrained'):
-    """Get model information based on sequence length and variant"""
+    """Get model information based on sequence length and variant
+
+    For variable length model, use sequence_length='var_50_120' or 'variable'.
+    """
     models = {
         60: {
             'pretrained': {
@@ -51,6 +54,24 @@ def get_model_info(sequence_length, variant='pretrained'):
                 'dataset': 'L110_ctx1500_ds50000'
             }
         },
+        117: {
+            'pretrained': {
+                'model_name': 'model_seq_len_110.pt',
+                'repo_id': 'mli-lab/TReconLM',
+                'block_size': 1500,
+                'description': 'Pretrained on synthetic IDS data (110nt) - closest to 117nt',
+                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset': 'L110_ctx1500_ds50000'
+            },
+            'chandak': {
+                'model_name': 'finetuned_chandak_len117.pt',
+                'repo_id': 'mli-lab/TReconLM',
+                'block_size': 1500,
+                'description': 'Fine-tuned on Chandak dataset (117nt)',
+                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset': 'L110_ctx1500_ds50000'
+            }
+        },
         180: {
             'pretrained': {
                 'model_name': 'model_seq_len_180.pt',
@@ -60,11 +81,27 @@ def get_model_info(sequence_length, variant='pretrained'):
                 'dataset_repo_id': 'mli-lab/TReconLM_datasets',
                 'dataset': 'L180_ctx2400_ds50000'
             }
+        },
+        # Variable length model (50-120nt)
+        'var_50_120': {
+            'pretrained': {
+                'model_name': 'model_var_len_50_120.pt',
+                'repo_id': 'mli-lab/TReconLM',
+                'block_size': 2400,
+                'description': 'Pretrained on variable length sequences (50-120nt). Best for fine-tuning on custom real-world data.',
+                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset': 'L110_ctx1500_ds50000'
+            }
         }
     }
 
+    # Handle 'variable' as alias for 'var_50_120'
+    if sequence_length == 'variable':
+        sequence_length = 'var_50_120'
+
     if sequence_length not in models:
-        raise ValueError(f"No model available for sequence length {sequence_length}")
+        raise ValueError(f"No model available for sequence length {sequence_length}. "
+                        f"Available: {list(models.keys())}")
 
     if variant not in models[sequence_length]:
         print(f"Warning: variant '{variant}' not available, using 'pretrained'")
@@ -77,15 +114,28 @@ def list_available_models():
     return """
 ### Available Models
 
+#### Pretrained Models (Fixed Length)
 | Length | Variant | Model Name | Description |
 |--------|---------|------------|-------------|
 | 60nt | pretrained | model_seq_len_60.pt | Pretrained on synthetic IDS data |
-| 60nt | noisy_dna | finetuned_noisy_dna_len60.pt | Fine-tuned on Noisy DNA dataset |
 | 110nt | pretrained | model_seq_len_110.pt | Pretrained on synthetic IDS data |
-| 110nt | microsoft | finetuned_microsoft_dna_len110.pt | Fine-tuned on Microsoft DNA dataset |
 | 180nt | pretrained | model_seq_len_180.pt | Pretrained on synthetic IDS data |
 
-**Block sizes:** 60nt=800, 110nt=1500, 180nt=2400
+#### Pretrained Models (Variable Length)
+| Length | Variant | Model Name | Description |
+|--------|---------|------------|-------------|
+| 50-120nt | pretrained | model_var_len_50_120.pt | Pretrained on variable length sequences. **Recommended for fine-tuning on custom real-world data.** |
+
+#### Fine-tuned Models
+| Length | Variant | Model Name | Description |
+|--------|---------|------------|-------------|
+| 60nt | noisy_dna | finetuned_noisy_dna_len60.pt | Fine-tuned on Noisy DNA dataset |
+| 110nt | microsoft | finetuned_microsoft_dna_len110.pt | Fine-tuned on Microsoft DNA dataset |
+| 117nt | chandak | finetuned_chandak_len117.pt | Fine-tuned on Chandak dataset |
+
+**Block sizes:** 60nt=800, 110nt/117nt=1500, 180nt/variable=2400
+
+To fine-tune on your own real-world data without pretraining from scratch, use the variable length pretrained model (`model_var_len_50_120.pt`) as a starting point.
 """
 
 def validate_reads_file(filepath):

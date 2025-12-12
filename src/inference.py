@@ -7,6 +7,14 @@ os.environ["NCCL_P2P_DISABLE"] = "1"
 import torch
 import pickle
 import wandb
+
+# Global flag for wandb logging - set by config during init
+_WANDB_ENABLED = True
+
+def wandb_log_safe(data):
+    """Only log to wandb if enabled"""
+    if _WANDB_ENABLED:
+        wandb_log_safe(data)
 import numpy as np
 import math
 from datetime import datetime
@@ -1945,7 +1953,7 @@ def log_entropy_analysis(entropy_stats, use_wandb=True):
                 data=table_data
             )
 
-            wandb.log({
+            wandb_log_safe({
                 "entropy_by_cluster_size_table": table,
                 "entropy_stats_dict": entropy_stats,
                 "entropy_correlation": correlation
@@ -2262,7 +2270,7 @@ def run_timing_measurement(cfg, model, meta, device, ctx, all_data):
     for i, throughput in enumerate(all_throughputs):
         wandb_log[f'timing_run_{i+1}_throughput'] = throughput
 
-    wandb.log(wandb_log)
+    wandb_log_safe(wandb_log)
     print(f"Timing results logged to WandB")
 
 
@@ -2321,6 +2329,9 @@ def _main_impl(cfg: DictConfig):
     wandb_run_id = ckpt.get("wandb_run_id", None)  
 
     # Only rank 0 (or single process) initializes W&B
+    wandb_log = cfg.wandb.get('wandb_log', True)
+    global _WANDB_ENABLED
+    _WANDB_ENABLED = wandb_log
     if rank == 0:
         run_cfg  = wandb_kwargs_via_cfg(cfg)
         now      = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2333,26 +2344,40 @@ def _main_impl(cfg: DictConfig):
                                cfg.wandb.wandb_project,
                                run_name)
         os.makedirs(out_dir, exist_ok=True)
-        print(f"wandb_run_id from checkpoint: {wandb_run_id}")
-        
-        print("cfg says entity/project:", cfg.wandb.wandb_entity, cfg.wandb.wandb_project)
-                
-        # Try to resume the run from checkpoint, fallback to new run if fails
-        try:
-            if wandb_run_id:
-                # First try to resume the existing run
-                wandb.init(
-                    project=cfg.wandb.wandb_project,
-                    entity=cfg.wandb.wandb_entity,
-                    name=run_name,
-                    config=run_cfg,
-                    dir=out_dir,
-                    id=wandb_run_id,
-                    resume="must"
-                )
-                print(f"Successfully resumed wandb run: {wandb_run_id}")
-            else:
-                # No run ID in checkpoint, start new run
+
+        if wandb_log:
+            print(f"wandb_run_id from checkpoint: {wandb_run_id}")
+            print("cfg says entity/project:", cfg.wandb.wandb_entity, cfg.wandb.wandb_project)
+
+            # Try to resume the run from checkpoint, fallback to new run if fails
+            try:
+                if wandb_run_id:
+                    # First try to resume the existing run
+                    wandb.init(
+                        project=cfg.wandb.wandb_project,
+                        entity=cfg.wandb.wandb_entity,
+                        name=run_name,
+                        config=run_cfg,
+                        dir=out_dir,
+                        id=wandb_run_id,
+                        resume="must"
+                    )
+                    print(f"Successfully resumed wandb run: {wandb_run_id}")
+                else:
+                    # No run ID in checkpoint, start new run
+                    wandb.init(
+                        project=cfg.wandb.wandb_project,
+                        entity=cfg.wandb.wandb_entity,
+                        name=run_name,
+                        config=run_cfg,
+                        dir=out_dir,
+                        resume=None
+                    )
+                    print("Started new wandb run (no run ID in checkpoint)")
+            except Exception as e:
+                print(f"Failed to resume wandb run {wandb_run_id}: {e}")
+                print("Starting new wandb run...")
+                # Resume failed, start a new run
                 wandb.init(
                     project=cfg.wandb.wandb_project,
                     entity=cfg.wandb.wandb_entity,
@@ -2361,21 +2386,10 @@ def _main_impl(cfg: DictConfig):
                     dir=out_dir,
                     resume=None
                 )
-                print("Started new wandb run (no run ID in checkpoint)")
-        except Exception as e:
-            print(f"Failed to resume wandb run {wandb_run_id}: {e}")
-            print("Starting new wandb run...")
-            # Resume failed, start a new run
-            wandb.init(
-                project=cfg.wandb.wandb_project,
-                entity=cfg.wandb.wandb_entity,
-                name=run_name,
-                config=run_cfg,
-                dir=out_dir,
-                resume=None
-            )
-            print("Started new wandb run")
-            sys.stdout.flush()
+                print("Started new wandb run")
+                sys.stdout.flush()
+        else:
+            print(f"W&B logging disabled, saving results to: {out_dir}")
 
     # Don't need barrier after wandb init - only rank 0 uses it
     # First real synchronization will be after model loading
@@ -2998,7 +3012,7 @@ def _main_impl(cfg: DictConfig):
                     'misclustering_total_conditions': int(len(misclustering_results['results_by_condition'])),
                     'misclustering_total_contamination_events': int(len(misclustering_results['contamination_details']))
                 }
-                wandb.log(misc_metadata)
+                wandb_log_safe(misc_metadata)
 
                 # Log results for each experimental condition (overall results)
                 for condition_name, condition_data in misclustering_results['results_by_condition'].items():
@@ -3012,7 +3026,7 @@ def _main_impl(cfg: DictConfig):
                         f'misclustering_{condition_name}_success_rate_all': float(metrics['success_rate']),
                         f'misclustering_{condition_name}_failure_rate_all': float(metrics['failure_rate']),
                     }
-                    wandb.log(condition_log)
+                    wandb_log_safe(condition_log)
 
                 # Log detailed bin metrics for heatmap (contamination_rate × multiplier_bin)
                 total_bin_entries = 0
@@ -3026,7 +3040,7 @@ def _main_impl(cfg: DictConfig):
                                 f'misclustering_{condition_name}_{bin_name}_std_levenshtein': float(bin_metrics['std_levenshtein']),
                                 f'misclustering_{condition_name}_{bin_name}_num_examples': int(bin_metrics['num_examples'])
                             }
-                            wandb.log(bin_log)
+                            wandb_log_safe(bin_log)
                             total_bin_entries += 1
                 print(f"  Logged {total_bin_entries} detailed bin metrics for heatmap")
 
@@ -3057,7 +3071,7 @@ def _main_impl(cfg: DictConfig):
                                 f'misclustering_{condition_name}_N{N}_contaminated_success_rate': float(cont_metrics['success_rate']),
                                 f'misclustering_{condition_name}_N{N}_contaminated_failure_rate': float(cont_metrics['failure_rate']),
                             }
-                            wandb.log(cluster_log)
+                            wandb_log_safe(cluster_log)
                             total_cluster_entries += 1
                 print(f"  Logged {total_cluster_entries} detailed cluster size metrics")
 
@@ -3071,7 +3085,7 @@ def _main_impl(cfg: DictConfig):
                         'misclustering_2d_contamination_rates': list(results_2d['contamination_rates']),  # Convert to list
                         'misclustering_2d_multiplier_bins': list(results_2d['multiplier_bins'])  # Convert to list
                     }
-                    wandb.log(matrix_log)
+                    wandb_log_safe(matrix_log)
                     print(f"  Logged 2D matrices for heatmap visualization")
 
                 # Log cluster size 2D matrices if available
@@ -3084,7 +3098,7 @@ def _main_impl(cfg: DictConfig):
                         'misclustering_cluster_size_contamination_rates': list(results_2d_cs['contamination_rates']),
                         'misclustering_cluster_size_cluster_sizes': list(results_2d_cs['cluster_sizes'])
                     }
-                    wandb.log(cluster_matrix_log)
+                    wandb_log_safe(cluster_matrix_log)
                     print(f"  Logged cluster size 2D matrices for heatmap visualization")
 
                 print(f"Misclustering robustness results logged to WandB")
@@ -3222,7 +3236,7 @@ def _main_impl(cfg: DictConfig):
                     log_dict['confidence_lowest_mean_top1'] = float(margin_stats['lowest_confidence_cluster']['mean_top1_prob'])
 
                 # Log everything at once
-                wandb.log(log_dict)
+                wandb_log_safe(log_dict)
                 print(f"\nLogged {len(log_dict)} confidence metrics to WandB")
                 print(f"Search for 'confidence' in your WandB run to view results")
 
@@ -3321,7 +3335,7 @@ def _main_impl(cfg: DictConfig):
 
                 # Log to WandB - overall metrics
                 if wandb.run is not None:
-                    wandb.log({
+                    wandb_log_safe({
                         f'baseline_{rate_name}_overall_mean_hamming': rate_metrics['mean_hamming'],
                         f'baseline_{rate_name}_overall_std_hamming': rate_metrics['std_hamming'],
                         f'baseline_{rate_name}_overall_mean_levenshtein': rate_metrics['mean_levenshtein'],
@@ -3331,7 +3345,7 @@ def _main_impl(cfg: DictConfig):
 
                     # Log per-cluster-size metrics
                     for cs, cs_metrics in cluster_size_aggregates.items():
-                        wandb.log({
+                        wandb_log_safe({
                             f'baseline_{rate_name}_cs{cs}_mean_hamming': cs_metrics['mean_hamming'],
                             f'baseline_{rate_name}_cs{cs}_std_hamming': cs_metrics['std_hamming'],
                             f'baseline_{rate_name}_cs{cs}_mean_levenshtein': cs_metrics['mean_levenshtein'],
@@ -3512,7 +3526,7 @@ def _main_impl(cfg: DictConfig):
                         print(f"Logging {sample_size} sampled position metrics to W&B...")
                         for idx in sample_indices:
                             metric = all_position_metrics[idx]
-                            wandb.log({
+                            wandb_log_safe({
                                 "position_vote_margin": metric['vote_margin'],
                                 "position_prob_margin": metric['prob_margin'],
                                 "position_top1_prob": metric['top1_prob'],
@@ -3559,7 +3573,7 @@ def _main_impl(cfg: DictConfig):
                         f"failure_rate_full_k={k}":    1 - (success_count_full / n_ex),
                         f"cross_mode_k={k}": cross_mode
                     })
-                wandb.log(log_dict)
+                wandb_log_safe(log_dict)
             else:
                 # breakdown by N for both cropped and full metrics
                 count = defaultdict(int)
@@ -3618,7 +3632,7 @@ def _main_impl(cfg: DictConfig):
                             f"std_levenshtein_full_N={N}":   float(l_arr_full.std()),
                         })
 
-                    wandb.log(metrics_dict)
+                    wandb_log_safe(metrics_dict)
 
                 # Log majority voting metrics if enabled
                 majority_cfg = cfg.model.sampling.get('majority_voting', {})
@@ -3697,7 +3711,7 @@ def _main_impl(cfg: DictConfig):
                                 f'majority_voting_vote_agreement_N={N}': float(vote_agreement_arr.mean()),
                                 f'majority_voting_num_perms_N={N}': num_perms,
                             }
-                            wandb.log(mv_log)
+                            wandb_log_safe(mv_log)
 
                         # Overall majority voting metrics
                         all_first_lev = np.array([r[15] for r in all_results])
@@ -3738,7 +3752,7 @@ def _main_impl(cfg: DictConfig):
                             'majority_voting_vote_agreement_all': float(all_vote_agreement.mean()),
                             'majority_voting_helped_rate_all': float((all_lev_improvement > 0).mean()),
                         }
-                        wandb.log(mv_overall_log)
+                        wandb_log_safe(mv_overall_log)
 
                         # Test mode summary
                         if test_mode:
@@ -3804,7 +3818,7 @@ def _main_impl(cfg: DictConfig):
                         log_dict['evaluation_full_length'] = 110     # Full sequence length
                         log_dict['original_seq_length'] = 110        # Original Microsoft sequences
 
-                wandb.log(log_dict)
+                wandb_log_safe(log_dict)
 
                 # Log misclustering robustness results if available
                 if misclustering_results and wandb.run is not None:
@@ -3819,7 +3833,7 @@ def _main_impl(cfg: DictConfig):
                         'misclustering_total_conditions': len(misclustering_results['results_by_condition']),
                         'misclustering_total_contamination_events': len(misclustering_results['contamination_details'])
                     }
-                    wandb.log(misc_metadata)
+                    wandb_log_safe(misc_metadata)
 
                     # Analyze contamination details and group by realized edit distance multipliers
                     contamination_details = misclustering_results['contamination_details']
@@ -3842,7 +3856,7 @@ def _main_impl(cfg: DictConfig):
                                 'misclustering_std_realized_multiplier': np.std(all_multipliers),
                                 'misclustering_num_contamination_events': len(all_multipliers)
                             }
-                            wandb.log(multiplier_stats)
+                            wandb_log_safe(multiplier_stats)
 
                             print(f"    Realized edit distance multipliers: {multiplier_stats['misclustering_min_realized_multiplier']:.2f} - {multiplier_stats['misclustering_max_realized_multiplier']:.2f} (mean: {multiplier_stats['misclustering_mean_realized_multiplier']:.2f})")
 
@@ -3857,7 +3871,7 @@ def _main_impl(cfg: DictConfig):
                             'misclustering_multiplier_range_max': bin_config.get('max_multiplier', 0),
                             'misclustering_bin_width': bin_config.get('bin_width', 0)
                         }
-                        wandb.log(bin_config_log)
+                        wandb_log_safe(bin_config_log)
 
                         # Log 2D results: contamination_rate × multiplier_bin
                         total_2d_entries = 0
@@ -3872,7 +3886,7 @@ def _main_impl(cfg: DictConfig):
                                         f'misclustering_{condition_name}_{bin_name}_num_examples': bin_metrics['num_examples'],
                                         f'misclustering_{condition_name}_{bin_name}_mean_cluster_size': bin_metrics['mean_cluster_size']
                                     }
-                                    wandb.log(bin_log)
+                                    wandb_log_safe(bin_log)
                                     total_2d_entries += 1
 
                         print(f"    Logged {total_2d_entries} 2D heatmap cells to WandB")
@@ -3890,7 +3904,7 @@ def _main_impl(cfg: DictConfig):
                             f'misclustering_{condition_name}_success_rate_all': metrics['success_rate'],
                             f'misclustering_{condition_name}_failure_rate_all': metrics['failure_rate'],
                         }
-                        wandb.log(condition_log)
+                        wandb_log_safe(condition_log)
 
                     # Log per-cluster size analysis
                     cluster_summary = {}
@@ -3908,7 +3922,7 @@ def _main_impl(cfg: DictConfig):
                                     cluster_summary[f'misclustering_cluster_{cluster_size}_{condition}_std_hamming'] = np.std(hamming_vals)
 
                     if cluster_summary:
-                        wandb.log(cluster_summary)
+                        wandb_log_safe(cluster_summary)
 
                     print(f"Misclustering robustness results logged to WandB")
 

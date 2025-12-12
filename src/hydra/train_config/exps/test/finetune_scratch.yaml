@@ -1,33 +1,38 @@
 # @package _global_
 
 # =============================================================================
-# Quick test for pretraining from scratch
-# Generates synthetic data on-the-fly (no external data needed)
+# Quick test for fine-tuning from scratch
+# Uses tutorial/example_data (10 examples: 8 train, 2 val)
 # Runs ~100 iterations with a small model
 #
-# Usage: python src/pretrain.py exps=test/pretrain_scratch
+# Usage: python src/finetune.py exps=test/finetune_scratch
 # =============================================================================
 
 defaults:
   - override /general: scratch     # Start from random initialization
-  - override /data: ids_data       # IDS channel data (insertions, deletions, substitutions)
   - override /model: gpt           # Use GPT architecture
   - override /train: base          # Base training settings
+  - override /finetune: test_example  # Data paths for tutorial/example_data
 
 # Project and experiment names (used for logging and checkpoint folders)
 project: TRACE_RECONSTRUCTION
-experiment: pretraining_test
+experiment: finetune_test
+
+general:
+  checkpoint_path: tutorial/example_data/checkpoints  # Where to save checkpoints
 
 # -----------------------------------------------------------------------------
-# Data settings (synthetic data generated on-the-fly)
+# Data settings
 # -----------------------------------------------------------------------------
 data:
+  data_type: example_data
   sequence_type: nuc              # Nucleotide sequences (ACGT)
+  observation_size: 10            # Max reads per cluster
   target_type: CPRED              # Candidate prediction (predict ground truth from reads)
-  observation_size: 5             # Max reads per cluster
-  ground_truth_length: 60         # Sequence length in nucleotides
+  ground_truth_length: 110        # Sequence length in nucleotides
   lower_bound_obs_size: 2         # Min reads per cluster
-  block_size: 600                 # Context window size (must fit reads + ground truth)
+  block_size: 1500                # Context window size (must fit reads + ground truth)
+  train_seed: 42                  # Random seed (shuffling data + torch initialization)
 
 # -----------------------------------------------------------------------------
 # Training settings
@@ -37,16 +42,16 @@ train:
 
   # Iteration settings
   max_iters: 100                  # Total training iterations (quick test)
-  batch_size: 4                   # Examples per batch
+  batch_size: 2                   # Examples per batch (8 train examples / 2 = 4 batches per epoch)
   gradient_accumulation_steps: 1  # Accumulate gradients (effective_batch = batch_size * this)
 
   # Evaluation settings
-  eval_interval: 50               # Evaluate every N iterations
-  eval_iters: 10                  # Batches to evaluate (synthetic data, so can use more)
+  eval_interval: 25               # Evaluate every N iterations
+  eval_iters: 1                   # Batches to evaluate (1 batch * 2 examples = 2 val examples)
   eval_only: false                # If true, only run evaluation (no training)
 
   # Checkpointing
-  always_interval: 50             # Save checkpoint every N iterations
+  always_interval: 25             # Save checkpoint every N iterations
   always_save_checkpoint: true    # Always save (not just on improvement)
 
   # Logging
@@ -54,7 +59,7 @@ train:
 
   # Optimizer settings
   learning_rate: 0.0001           # Initial learning rate
-  weight_decay: 0.1               # L2 regularization
+  weight_decay: 0.001             # L2 regularization
   beta1: 0.9                      # Adam beta1
   beta2: 0.95                     # Adam beta2
   grad_clip: 1.0                  # Gradient clipping threshold
@@ -74,7 +79,7 @@ model:
     n_layer: 2                    # Transformer layers (paper uses 12)
     n_head: 2                     # Attention heads (paper uses 8)
     n_embd: 64                    # Embedding dimension (paper uses 512)
-    dropout: 0                    # Dropout rate
+    dropout: 0.1                  # Dropout rate
     bias: false                   # No bias in linear layers
 
 # -----------------------------------------------------------------------------

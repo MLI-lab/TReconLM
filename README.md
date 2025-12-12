@@ -43,6 +43,22 @@ Start with the tutorial notebooks in `tutorial/`:
 - [`quick_start.ipynb`](tutorial/quick_start.ipynb): Download models from HuggingFace and run inference on synthetic datasets
 - [`custom_data.ipynb`](tutorial/custom_data.ipynb): Run inference on your own data or use the Microsoft/Noisy DNA datasets
 
+### Command-Line Inference
+
+```bash
+python src/inference.py exps=<experiment>
+```
+
+Quick test (runs inference on `tutorial/example_data` with a pretrained model):
+```bash
+# Download a model from HuggingFace
+mkdir -p models
+python -c "from huggingface_hub import hf_hub_download; hf_hub_download('mli-lab/TReconLM', 'model_seq_len_110.pt', local_dir='models')"
+
+# Run inference
+python src/inference.py exps=test/inference_example
+```
+
 ### Data Format
 
 For custom data, provide two files:
@@ -66,36 +82,34 @@ export TRITON_PTXAS_PATH=/opt/conda/envs/treconlm/lib/python3.11/site-packages/n
 
 ### Pretraining
 
-In `src`, you can run:
-
 ```bash
-torchrun --nproc_per_node=<available_gpus> pretrain.py exps=...
+python src/pretrain.py exps=<experiment>
 ```
 
-and choose a pretraining experiment from  
-`src/hydra/config/train_config/exps` (contains all configurations used in our paper).
-
-Example:
-
+Quick test (runs 100 iterations with a small model):
 ```bash
-python pretrain.py exps=test/pretrain_scratch
+python src/pretrain.py exps=test/pretrain_scratch
 ```
 
-> Use `torchrun` for multi-GPU runs. For single-GPU, `python` also works.  
-> Pretraining data is generated on the fly during training.
+To reproduce paper results or train with different settings, choose an experiment from `src/hydra/train_config/exps/` (e.g., `ids_110nt/ids_110nt`, `ids_60nt/ids_60nt`).
 
-Example cluster scripts can be found in `/slurm_pkg`.
+> Use `torchrun --nproc_per_node=<gpus>` for multi-GPU training.
+> Pretraining data is generated on the fly.
 
 ### Fine-tuning
 
-In `src`, run:
-
 ```bash
-torchrun --nproc_per_node=<available_gpus> finetune.py exps=...
+python src/finetune.py exps=<experiment>
 ```
 
-and choose a fine-tuning experiment from `src/hydra/config/train_config/exps`.  
-Available experiments include `microsoft_data` and `noisy_dna`.
+Quick test (runs 100 iterations on `tutorial/example_data`):
+```bash
+python src/finetune.py exps=test/finetune_scratch
+```
+
+To fine-tune on real datasets, use experiments like `microsoft/mic` or `noisyDNA/noisy` from `src/hydra/train_config/exps/`.
+
+Example cluster scripts can be found in `src/slurm_pkg/`.
 
 ---
 

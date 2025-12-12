@@ -57,7 +57,7 @@ def init_model(cfg, block_size, meta_vocab_size, stoi):
         model       = GPT(gpt_cfg)
         model_args  = vars(gpt_cfg).copy()
         model_args["model_type"] = "gpt"
-        compile = True   # torch.compile brings speed‑up for Transformers
+        compile = getattr(cfg.model, 'compile', True)  # configurable, default True
 
     # ───────────────────────────── LSTM ────────────────────────────
     elif model_type == "lstm":
@@ -154,7 +154,7 @@ def load_model(cfg, device, out_dir, block_size, rank, stoi):
 
     # Rebuild correct model
     if model_type == "gpt":
-        compile = True
+        compile = getattr(cfg.model, 'compile', True)  # configurable, default True
         model_args = dict(
             n_layer    = cfg.model.gpt_params.n_layer,
             n_head     = cfg.model.gpt_params.n_head,
@@ -375,6 +375,7 @@ def train(cfg: DictConfig) -> None:
     eval_only     = cfg.train.eval_only # if True, script exits right after the first eval, useful for testing the model without modifying weights
 
     always_save_checkpoint = cfg.train.always_save_checkpoint # if True, always save a checkpoint after each eval
+    always_interval = cfg.train.always_interval  # save checkpoint every N iterations
 
     device = cfg.train.device # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1' etc., or try 'mps' on macbooks
     gradient_accumulation_steps = cfg.train.gradient_accumulation_steps # used to simulate larger batch sizes
@@ -781,7 +782,7 @@ def train(cfg: DictConfig) -> None:
                     print(f"Save checkpoint to {out_dir}")
                     torch.save(checkpoint, os.path.join(out_dir, 'checkpoint_best.pt')) 
 
-        if always_save_checkpoint and iter_num % 500 == 0 and iter_num > 0:
+        if always_save_checkpoint and iter_num % always_interval == 0 and iter_num > 0:
             local_rng = get_rng_state_dict()
 
             if ddp:
@@ -898,8 +899,7 @@ def train(cfg: DictConfig) -> None:
     
     if master_process:
         # region ------------------------------------ FINISH ------------------------------------
-        print("Training finished")
-        print('empyt_batch_flag: ', empty_batch_flag) 
+        print("Training finished") 
     
         if wandb_log:
             wandb.log({

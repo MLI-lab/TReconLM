@@ -1,0 +1,39 @@
+defaults:
+  - base
+
+# =============================================================================
+# Test fine-tuning config using tutorial/example_data
+# Usage: python src/finetune.py exps=test/finetune_scratch
+# =============================================================================
+
+# Dataset identifier (for logging/naming)
+finetune_data_type: example_data
+
+# Target type: CPRED = candidate prediction target
+# Model predicts ground truth sequence from noisy reads
+# Input format: read1|read2|...|readN:ground_truth
+finetune_target_type: CPRED
+
+# Cluster size settings
+finetune_observation_size: 10       # Maximum reads per cluster
+finetune_lower_bound_obs_size: 2    # Minimum reads per cluster
+
+# Sequence settings
+finetune_ground_truth_length: 110   # Expected ground truth length in nucleotides
+finetune_sequence_type: nuc         # Nucleotide sequences (ACGT)
+
+# Experiment name (used for checkpoint folder naming)
+finetune_experiment: 'finetune_test'
+
+# Path to training data folder containing train.txt and val.txt
+# Format: each line is "read1|read2|...:ground_truth"
+data_folder: tutorial/example_data
+
+# Training and validation file names
+finetune_filename_train: 'train.txt'
+finetune_filename_val: 'val.txt'
+
+# Path to pretrained model checkpoint folder
+# Set to None to train from scratch (random initialization)
+# Set to a path to fine-tune from a pretrained checkpoint
+model_dir: None

@@ -1,0 +1,43 @@
+# @package _global_
+
+# Quick test for inference using tutorial/example_data (10 examples)
+#
+# SETUP: First download the model from HuggingFace:
+#   python -c "from huggingface_hub import hf_hub_download; hf_hub_download('mli-lab/TReconLM', 'model_seq_len_110.pt', local_dir='models')"
+#
+# Usage: python src/inference.py exps=test/inference_example
+
+defaults:
+  - override /data: ids_data
+  - override /model: gpt
+
+project: 'InferenceTest'
+experiment: 'test_inference_example_data'
+
+data:
+  # Use local example data instead of downloading from wandb
+  local_data_dir: tutorial/example_data
+  artifact_name: local_example_data  # Not used when local_data_dir is set
+  ground_truth_length: 110
+  block_size: 1500
+  batch_size: 5
+  observation_size: 10
+  lower_bound_obs_size: 2
+  test_dataset_size: 10  # Only 10 examples in tutorial data
+
+model:
+  # Path to downloaded model (see SETUP instructions above)
+  checkpoint_path: models/model_seq_len_110.pt
+
+  sampling:
+    temperature: 1.0
+    top_k: null
+    strategy: greedy
+    max_new_tokens: ${data.ground_truth_length}
+    constrained_generation: true  # Only generate ACTG
+
+    majority_voting:
+      enabled: false
+
+wandb:
+  wandb_log: false

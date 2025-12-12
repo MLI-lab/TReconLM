@@ -61,8 +61,7 @@ data:
 
 # Training hyperparameters
 train:
-  # Distributed training
-  ddp: ~                              # true/false/~ (auto-detect)
+  # Note: DDP is auto-detected via torchrun (no config needed)
 
   # Evaluation and logging
   eval_interval: 500                  # Evaluate every N iterations
@@ -100,6 +99,7 @@ train:
 # Model architecture
 model:
   model_type: gpt                     # gpt, lstm, or mamba
+  compile: true                       # torch.compile for speedup (set false for Python 3.11+)
 
   # GPT parameters
   gpt_params:
@@ -165,7 +165,7 @@ data:
 
 # Training hyperparameters (fine-tuning specific)
 train:
-  ddp: false
+  # Note: DDP is auto-detected via torchrun (no config needed)
   eval_interval: 250                  # More frequent evaluation
   log_interval: 10
   eval_iters: 250
@@ -189,6 +189,7 @@ train:
 
 # Model architecture (MUST match pretrained checkpoint)
 model:
+  compile: true                       # torch.compile for speedup (set false for Python 3.11+)
   gpt_params:
     n_layer: 12                       # Must match checkpoint
     n_head: 8                         # Must match checkpoint

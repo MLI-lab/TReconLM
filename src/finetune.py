@@ -40,7 +40,7 @@ def init_model(cfg, block_size, meta_vocab_size):
 
     if model_type == 'gpt':
         from src.gpt_pkg.model import GPTConfig, GPT
-        compile = True
+        compile = getattr(cfg.model, 'compile', True)  # configurable, default True
 
         n_layer  = cfg.model.gpt_params.n_layer
         n_head   = cfg.model.gpt_params.n_head
@@ -79,7 +79,7 @@ def load_model(cfg, device, model_dir, block_size, init_from, finetune_out_dir=N
     print('file exists:', os.path.exists(ckpt_path))
 
 
-    compile = True
+    compile = getattr(cfg.model, 'compile', True)  # configurable, default True
     model_args = dict(
         n_layer=cfg.model.gpt_params.n_layer,
         n_head=cfg.model.gpt_params.n_head,
@@ -289,7 +289,8 @@ def train(cfg: DictConfig) -> None:
         cfg.train.max_iters = max_iters  # update config dynamically if not based on max iterations but based on epochs
 
     print(f"Training size: {train_len}, Batch size: {batch_size}, Steps/epoch: {steps_per_epoch}")
-    print(f"Max epochs: {cfg.train.max_epochs}, Max iters: {cfg.train.max_iters}")
+    max_epochs = getattr(cfg.train, 'max_epochs', None)
+    print(f"Max epochs: {max_epochs}, Max iters: {cfg.train.max_iters}")
 
     # so it gets logged to wandb
     config_dict['max_iters'] = cfg.train.max_iters
