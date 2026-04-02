@@ -19,7 +19,7 @@ import multiprocessing as mp
 from Bio import SeqIO
 import pandas as pd
 import numpy as np
-import editdistance
+from Levenshtein import distance as editdistance_eval
 from tqdm import tqdm
 
 
@@ -99,7 +99,7 @@ def search_prefix_in_read(read_seq, prefix, edit_dist_threshold=0):
 
     for i in range(len(read_seq) - prefix_len + 1):
         window = read_seq[i:i + prefix_len]
-        dist = editdistance.eval(window, prefix)
+        dist = editdistance_eval(window, prefix)
 
         if dist < best_dist:
             best_dist = dist

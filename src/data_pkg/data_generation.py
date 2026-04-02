@@ -13,11 +13,11 @@ import json
 
 import wandb
 
-from ..data_pkg.IDS_channel import IDS_alignment_channel, IDS_channel
+from ..data_pkg.IDS_channel import IDS_alignment_channel, IDS_channel, realistic_IDS_channel
 
 from ..utils.data_functions import write_data_to_file
 from ..utils.sys_functions import get_available_memory
-from ..utils.helper_functions import create_folder
+from ..utils.helper_functions import create_folder, compute_homopolymer_map, weighted_choice
 from ..utils.print_functions import print_list
 from ..utils.wandb_utils import wandb_kwargs_via_cfg
 from ..data_pkg.prepare import encode_list, pad_encoded_data
@@ -571,6 +571,90 @@ def generate_test_dataset(cfg: DictConfig, k=None) -> None:
     print("Logging artifact to W&B...")
     run.log_artifact(artifact)
     run.finish()
+
+def load_error_model(path):
+    """
+    Load error model JSON and preprocess for fast lookups during data generation.
+
+    Preprocesses:
+    - Burst length distributions into CDFs for sampling
+    - Substitution matrix into per-base weighted sampling distributions
+
+    Returns:
+        dict: Error model ready for use with realistic_IDS_channel().
+    """
+    with open(path) as f:
+        model = json.load(f)
+
+    return model
+
+
+def data_generation_with_error_model(error_model, observation_size, length_ground_truth, target_type, rng=None):
+    """
+    Generate one synthetic training example using a realistic error model estimated
+    from real-world data.
+
+    This is the error-model counterpart of data_generation(). It:
+    1. Generates a GT sequence using real-world nucleotide frequencies
+    2. Corrupts it using context-dependent error rates (nucleotide, homopolymer,
+       GC content, position zone)
+
+    Currently supports target_type='CPRED' only.
+
+    Parameters:
+        error_model (dict): Preprocessed error model from load_error_model().
+        observation_size (int): Number of noisy reads to generate.
+        length_ground_truth: Length of GT (int or [min, max] for variable length).
+        target_type (str): Must be 'CPRED'.
+        rng: Random number generator.
+
+    Returns:
+        List[List[str]]: Same format as data_generation():
+            [['ground_truth', [gt]], [target_type, ['obs1|obs2|...:gt']]]
+    """
+    rng = rng or random
+
+    if target_type != 'CPRED':
+        raise ValueError(f'data_generation_with_error_model only supports CPRED, got {target_type}')
+
+    # Sample GT length
+    sampled_length = sample_ground_truth_length(length_ground_truth, rng=rng)
+
+    # Generate realistic GT by sampling each base from real-world frequencies
+    freqs = error_model['gt_nucleotide_global']
+    bases = list(freqs.keys())
+    weights = [freqs[b] for b in bases]
+    gt = ''.join(weighted_choice(bases, weights, rng) for _ in range(sampled_length))
+
+    # Precompute context for this GT (once, shared across all reads)
+    gc_frac = (gt.count('G') + gt.count('C')) / len(gt)
+    gc_bin = 'low' if gc_frac < 0.30 else ('high' if gc_frac > 0.70 else 'mid')
+    homo_map = compute_homopolymer_map(gt)
+
+    # Read length bounds from real data (if available in error model)
+    # Reads outside these bounds are regenerated, matching real-data filtering
+    read_len_min = error_model.get('read_length_min', 0)
+    read_len_max = error_model.get('read_length_max', float('inf'))
+    max_retries = 10
+
+    # Generate N noisy reads
+    observation_list = []
+    for _ in range(observation_size):
+        for attempt in range(max_retries):
+            noisy_read = realistic_IDS_channel(gt, error_model, gc_bin, homo_map, rng)
+            if read_len_min <= len(noisy_read) <= read_len_max:
+                break
+        observation_list.append(noisy_read)
+
+    # Format output (same as data_generation for CPRED)
+    concatenated = '|'.join(observation_list)
+    data_example = concatenated + ':' + gt
+
+    data_pairs = [['ground_truth', [gt]]]
+    data_pairs.append([target_type, [data_example]])
+
+    return data_pairs
+
 
 if __name__ == "__main__":
     print("data_generation.py")

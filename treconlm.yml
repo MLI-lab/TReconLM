@@ -6,10 +6,8 @@ channels:
   - defaults
 dependencies:
   - python=3.11
-  # PyTorch with CUDA support
-  # NOTE: Driver 465.19.01 supports CUDA 11.3, but PyTorch 2.0+ requires CUDA 11.7+
-  # Solution: Install PyTorch with CUDA 11.7 (forward compatible with CUDA 11.3 driver)
-  - cudatoolkit=11.3
+  # PyTorch with CUDA support (matches Dev Container: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime)
+  - cudatoolkit=12.1
   - tensorboard
   - pytest
   - scipy=1.11.4
@@ -17,9 +15,9 @@ dependencies:
   - pip
   - pip:
     # PyTorch - use extra-index-url so other packages can still use PyPI
-    - --extra-index-url https://download.pytorch.org/whl/cu117
-    - torch==2.0.1+cu117
-    - torchvision==0.15.2+cu117
+    - --extra-index-url https://download.pytorch.org/whl/cu121
+    - torch==2.1.0+cu121
+    - torchvision==0.16.0+cu121
     # Pin versions for reproducibility and compatibility
     - numpy<2.0  # numpy 2.x has GLIBC compatibility issues
     - pillow<11  # pillow 11+ has GLIBC compatibility issues
@@ -42,7 +40,7 @@ dependencies:
     - datasets
     - tabulate
     - seaborn
-    - bitsandbytes==0.41.0  # Last version compatible with torch 2.0.x
+    - bitsandbytes  # Unpinned; torch 2.1.0 is compatible with recent versions
     - biopython
 
  # apt install build-essential

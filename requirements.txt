@@ -1,0 +1,32 @@
+# Pin torch/torchvision to match base Docker image (pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime)
+# Without pinning, other packages (e.g. bitsandbytes) may upgrade torch to an incompatible version
+torch==2.1.0
+torchvision==0.16.0
+# Other dependencies
+tensorboard
+pytest
+scipy==1.11.4
+imageio
+numpy<2.0
+pillow<11
+ipykernel
+ipywidgets
+tiktoken
+matplotlib
+tqdm
+wandb
+pyyaml
+pandas
+timm==0.9.16
+memory_profiler
+hydra-core
+pytz
+Levenshtein
+scikit-learn
+torchmetrics
+huggingface_hub
+datasets
+tabulate
+seaborn
+bitsandbytes
+biopython

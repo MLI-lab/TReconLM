@@ -72,3 +72,5 @@ data/chandak/test_y.pt
 data/chandak/train.txt
 data/chandak/test.txt
 data/chandak/val.txt
+data/chandak/data_chandak/
+data/chandak/nanopore_dna_storage_data/

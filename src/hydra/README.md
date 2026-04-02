@@ -41,12 +41,18 @@ data:
   block_size: 1500                    # Context window (800/1500/2400 for 60/110/180)
 
   # IDS noise parameters (bounds for random sampling during training)
+  # These are ignored when error_model_path is set.
   substitution_probability_lb: 0.01   # Min substitution rate
   substitution_probability_ub: 0.1    # Max substitution rate
   insertion_probability_lb: 0.01      # Min insertion rate
   insertion_probability_ub: 0.1       # Max insertion rate
   deletion_probability_lb: 0.01       # Min deletion rate
   deletion_probability_ub: 0.1        # Max deletion rate
+
+  # Realistic error model (optional, overrides lb/ub above)
+  # When set, uses context-dependent error rates estimated from real-world data.
+  # Generate with: python data/error_model/estimate_error_model.py <train.txt> --output-dir <dir>
+  error_model_path: null              # e.g. "data/error_model/results_microsoft/error_model.json"
 
   # Misclustering augmentation (optional)
   misclustering_training:
@@ -124,8 +130,10 @@ model:
 # WandB logging
 wandb:
   wandb_log: true                     # Enable WandB logging
-  wandb_project: ${project}           # Project name
+  wandb_project: ${project}           # Project name (for training logs)
   wandb_entity: your-entity           # WandB entity/team
+  test_project: TRACE_RECONSTRUCTION  # W&B project where test datasets are stored as artifacts
+                                      # If not set, falls back to wandb_project
 ```
 
 ---

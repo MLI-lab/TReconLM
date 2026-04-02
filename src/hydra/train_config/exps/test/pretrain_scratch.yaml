@@ -15,6 +15,9 @@ defaults:
   - override /train: base          # Base training settings
 
 # Project and experiment names (used for logging and checkpoint folders)
+# 'project' is the W&B project for training logs.
+# 'test_project' (under wandb:) is the W&B project where test datasets are stored as artifacts.
+# If test_project is not set, it falls back to project.
 project: TRACE_RECONSTRUCTION
 experiment: pretraining_test
 

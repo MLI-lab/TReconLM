@@ -20,7 +20,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf # to create, merge, and manipulate configs
 
 
-from src.data_pkg.data_generation import data_generation, validate_block_size_for_variable_length
+from src.data_pkg.data_generation import data_generation, data_generation_with_error_model, load_error_model, validate_block_size_for_variable_length
 from src.data_pkg.prepare import encode_list, pad_encoded_data
 from src.utils.helper_functions import extract_elements
 from src.utils.wandb_utils import wandb_kwargs_via_cfg
@@ -360,13 +360,26 @@ def train(cfg: DictConfig) -> None:
     # Validate block size can accommodate variable ground truth lengths
     validate_block_size_for_variable_length(ground_truth_length, block_size, observation_size)
 
-    insertion_probability_lb = cfg.data.insertion_probability_lb
-    deletion_probability_lb = cfg.data.deletion_probability_lb
-    substitution_probability_lb = cfg.data.substitution_probability_lb
-    
-    insertion_probability_ub = cfg.data.insertion_probability_ub
-    deletion_probability_ub = cfg.data.deletion_probability_ub
-    substitution_probability_ub = cfg.data.substitution_probability_ub
+    # Load realistic error model if specified, otherwise use uniform IDS channel
+    error_model_path = cfg.data.get('error_model_path', None)
+    if error_model_path:
+        error_model = load_error_model(error_model_path)
+        print(f"Loaded realistic error model from {error_model_path}")
+        # Error rate lb/ub not needed when using error model
+        insertion_probability_lb = None
+        deletion_probability_lb = None
+        substitution_probability_lb = None
+        insertion_probability_ub = None
+        deletion_probability_ub = None
+        substitution_probability_ub = None
+    else:
+        error_model = None
+        insertion_probability_lb = cfg.data.insertion_probability_lb
+        deletion_probability_lb = cfg.data.deletion_probability_lb
+        substitution_probability_lb = cfg.data.substitution_probability_lb
+        insertion_probability_ub = cfg.data.insertion_probability_ub
+        deletion_probability_ub = cfg.data.deletion_probability_ub
+        substitution_probability_ub = cfg.data.substitution_probability_ub
     
     # -----------------------------------TRAIN VARIABLES-----------------------------------
     eval_interval = cfg.train.eval_interval # check for new best val loss and save checkpoint
@@ -565,25 +578,36 @@ def train(cfg: DictConfig) -> None:
         batch_size_counter = 0
         sampled_lengths_batch = []  # Track sampled lengths for debugging
 
-        while batch_size_counter < batch_size: 
-            substitution_probability = random.uniform(substitution_probability_lb, substitution_probability_ub)
-            insertion_probability = random.uniform(insertion_probability_lb, insertion_probability_ub)
-            deletion_probability = random.uniform(deletion_probability_lb, deletion_probability_ub)
-
-            channel_statistics = {'substitution_probability': substitution_probability,
-                                    'insertion_probability': insertion_probability,
-                                    'deletion_probability': deletion_probability}
-
+        while batch_size_counter < batch_size:
             local_obs_size = random.randint(lower_bound_obs_size, observation_size) #randomly sample observation size (including observation_size)
 
-            # Get misclustering config if enabled
-            misclustering_config = cfg.data.get('misclustering_training', None)
+            if error_model is not None:
+                # Realistic error model: context-dependent error rates from real data
+                data = data_generation_with_error_model(
+                    error_model=error_model,
+                    observation_size=local_obs_size,
+                    length_ground_truth=ground_truth_length,
+                    target_type=target_type,
+                    rng=rng
+                )
+            else:
+                # Default: uniform random IDS channel
+                substitution_probability = random.uniform(substitution_probability_lb, substitution_probability_ub)
+                insertion_probability = random.uniform(insertion_probability_lb, insertion_probability_ub)
+                deletion_probability = random.uniform(deletion_probability_lb, deletion_probability_ub)
 
-            # Generates one noisy sequence at a time
-            data = data_generation(data_set_size = 1 , observation_size = local_obs_size,
-                                   length_ground_truth = ground_truth_length, channel_statistics = channel_statistics,
-                                    target_type = target_type, data_type =  data_type, rng=rng,
-                                    misclustering_config=misclustering_config)
+                channel_statistics = {'substitution_probability': substitution_probability,
+                                        'insertion_probability': insertion_probability,
+                                        'deletion_probability': deletion_probability}
+
+                # Get misclustering config if enabled
+                misclustering_config = cfg.data.get('misclustering_training', None)
+
+                data = data_generation(data_set_size = 1 , observation_size = local_obs_size,
+                                       length_ground_truth = ground_truth_length, channel_statistics = channel_statistics,
+                                        target_type = target_type, data_type =  data_type, rng=rng,
+                                        misclustering_config=misclustering_config)
+
             # Extracts the target type value, i.e. concatenated noisy reads, e.g., if alignment 'T--T' for one read, if not alignment and CPRED just TT
             data = extract_elements(data, target_type)[0]
 

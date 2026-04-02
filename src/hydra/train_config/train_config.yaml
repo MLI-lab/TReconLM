@@ -18,4 +18,4 @@ experiment: 'test'
 wandb: 
   wandb_log: true
   wandb_project: ${project}
-  wandb_entity: <your.wandb.entity>
+  wandb_entity: franziweindel-technical-university-of-munich

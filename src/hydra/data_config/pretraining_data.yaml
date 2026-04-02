@@ -27,6 +27,10 @@ deletion_probability_ub: ${upper_noise_bound}
 substitution_probability_lb: ${lower_noise_bound}
 substitution_probability_ub: ${upper_noise_bound}
 
+# Realistic error model (optional). If not specified or null, uses uniform IDS channel above.
+# When set, the probability lb/ub fields above are ignored.
+error_model_path: null  # e.g. "data/error_model/results_microsoft/error_model.json"
+
 group_name: ${data_type}_observation_size_${observation_size}_ground_truth_${ground_truth_length}
 noise_name: ${data_type}
 

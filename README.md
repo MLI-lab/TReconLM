@@ -7,7 +7,8 @@ TReconLM is a decoder-only transformer model for trace reconstruction of noisy D
 
 ## Installation
 
-Tested on `Ubuntu 22.04.4 LTS`.
+Tested on `Ubuntu 22.04.4 LTS`.  
+Uses **PyTorch 2.1.0** with **CUDA 12.1**. To change the version, update the `FROM` image in `.devcontainer/Dockerfile` and the `torch`/`torchvision`/`cudatoolkit`/`--extra-index-url` entries in `treconlm.yml`. Compatible versions for your CUDA can be found [here](https://pytorch.org/get-started/previous-versions/).
 
 Create the conda environment:
 
@@ -26,6 +27,10 @@ Set the Python path:
 ```bash
 export PYTHONPATH="${PYTHONPATH}:/path/to/treconlm"
 ```
+
+Alternatively, skip the above steps and open the project in a Dev Container using VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers). This will automatically build and start a Docker container with all dependencies pre-installed using `.devcontainer/devcontainer.json`.
+
+> **Note:** The `mounts` and `runArgs` in `.devcontainer/devcontainer.json` may need to be adjusted for your machine (e.g., available memory, CPUs, or additional bind mounts).
 
 ---
 

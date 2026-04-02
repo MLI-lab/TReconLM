@@ -1,7 +1,9 @@
 import numpy as np
 import random
 from ..utils.data_functions import filter_string
+from ..utils.helper_functions import compute_homopolymer_map, weighted_choice
 import sys
+import json
 
 def generate_insertion_pattern(n):
     """
@@ -318,6 +320,116 @@ def IDS_channel(x, channel_statistics, rng):
         print(substitution_list)
 
     return y
+
+
+def realistic_IDS_channel(x, error_model, gc_bin, homopolymer_map, rng=None):
+    """
+    Simulates one corrupted version of a DNA sequence using a realistic error model
+    estimated from real-world data.
+
+    Unlike IDS_channel which uses fixed error probabilities for all positions,
+    this function uses context-dependent rates based on:
+    - The nucleotide at each position (A/C/G/T)
+    - Homopolymer run length (1, 2, 3, 4, 5+)
+    - GC content of the sequence (low/mid/high)
+    - Position zone (start/middle/end)
+
+    Error rates are looked up from joint statistics when sufficient data exists
+    (>= 1000 observations), otherwise computed multiplicatively from marginal rates.
+
+    Parameters:
+        x (str): The ground truth input DNA sequence.
+        error_model (dict): Preprocessed error model from load_error_model().
+        gc_bin (str): GC content bin for this sequence ('low', 'mid', or 'high').
+        homopolymer_map (list): Precomputed homopolymer run length at each position.
+        rng: Random number generator (random.Random instance or None).
+
+    Returns:
+        str: The corrupted output sequence.
+    """
+    rng = rng or random
+    alphabet = ['A', 'C', 'G', 'T']
+    length = len(x)
+    y = []
+    t = 0
+
+    joint_rates = error_model['joint_rates']
+    per_nt = error_model['per_nucleotide']
+    multipliers = error_model['multipliers']
+    sub_weights = error_model['sub_weights']          # {base: {targets: [...], weights: [...]}}
+    burst_weights = error_model['burst_length_weights']  # {type: {lengths: [...], weights: [...]}}
+
+    while t < length:
+        base = x[t]
+        hp_len = homopolymer_map[t] if t < len(homopolymer_map) else 1
+        zone = 'start' if t < 10 else ('end' if t >= length - 10 else 'middle')
+
+        # Look up error rates
+        jkey = f"{base}|hp={hp_len}|gc={gc_bin}|{zone}"
+
+        if jkey in joint_rates and joint_rates[jkey]['total'] >= 1000:
+            # Use joint rate: sample from CI
+            jr = joint_rates[jkey]
+            p_sub = rng.uniform(jr['sub_rate_ci'][0], jr['sub_rate_ci'][1])
+            p_del = rng.uniform(jr['del_rate_ci'][0], jr['del_rate_ci'][1])
+            p_ins = rng.uniform(jr['ins_rate_ci'][0], jr['ins_rate_ci'][1])
+        else:
+            # Fallback: multiplicative model
+            base_sub = per_nt[base]['sub_rate']
+            base_del = per_nt[base]['del_rate']
+            base_ins = per_nt[base]['ins_rate']
+
+            hp_key = str(hp_len)
+            hp_m = multipliers['homopolymer'].get(hp_key, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
+            z_m = multipliers['position_zone'].get(zone, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
+            gc_m_key = '<0.30' if gc_bin == 'low' else ('>0.70' if gc_bin == 'high' else '0.30-0.70')
+            gc_m = multipliers['gc_content'].get(gc_m_key, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
+
+            p_sub = base_sub * hp_m['sub'] * z_m['sub'] * gc_m['sub']
+            p_del = base_del * hp_m['del'] * z_m['del'] * gc_m['del']
+            p_ins = base_ins * hp_m['ins'] * z_m['ins'] * gc_m['ins']
+
+        # Clamp total probability to < 1
+        p_total = p_sub + p_del + p_ins
+        if p_total >= 1.0:
+            scale = 0.95 / p_total
+            p_sub *= scale
+            p_del *= scale
+            p_ins *= scale
+
+        # Roll dice
+        rd = rng.uniform(0.0, 1.0)
+
+        if rd < p_del:
+            # Deletion: sample burst length
+            bw = burst_weights.get('deletion', {'lengths': [1], 'weights': [1.0]})
+            burst = weighted_choice(bw['lengths'], bw['weights'], rng)
+            t += min(burst, length - t)  # don't skip past end
+
+        elif rd < p_del + p_ins:
+            # Insertion: sample burst length, insert random bases
+            bw = burst_weights.get('insertion', {'lengths': [1], 'weights': [1.0]})
+            burst = weighted_choice(bw['lengths'], bw['weights'], rng)
+            for _ in range(burst):
+                y.append(rng.choice(alphabet))
+            # Don't advance t — current base still needs processing
+
+        elif rd < p_del + p_ins + p_sub:
+            # Substitution: sample target base from real distribution
+            if base in sub_weights:
+                sw = sub_weights[base]
+                y.append(weighted_choice(sw['targets'], sw['weights'], rng))
+            else:
+                sub_list = [b for b in alphabet if b != base]
+                y.append(rng.choice(sub_list))
+            t += 1
+
+        else:
+            # No error
+            y.append(x[t])
+            t += 1
+
+    return ''.join(y)
 
 
 if __name__ == '__main__':

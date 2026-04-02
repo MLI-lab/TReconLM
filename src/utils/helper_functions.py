@@ -327,6 +327,39 @@ def save_contaminated_attention_data(attention_sequence, read_boundaries, token_
         json.dump(data, f, indent=2)
 
 
+def weighted_choice(items, weights, rng):
+    """Choose from items with given weights (must sum to 1)."""
+    rd = rng.uniform(0.0, 1.0)
+    cum = 0.0
+    for item, w in zip(items, weights):
+        cum += w
+        if rd <= cum:
+            return item
+    return items[-1]
+
+
+def compute_homopolymer_map(seq):
+    """
+    For each position in seq, return the homopolymer run length it belongs to.
+    Runs of length >= 5 are bucketed as '5+'.
+
+    Example: seq = 'AACCCGT' -> [2, 2, 3, 3, 3, 1, 1]
+             seq = 'AAAAAC' -> ['5+', '5+', '5+', '5+', '5+', 1]
+    """
+    n = len(seq)
+    run_lengths = [1] * n
+    i = 0
+    while i < n:
+        j = i + 1
+        while j < n and seq[j] == seq[i]:
+            j += 1
+        run_len = j - i
+        for k in range(i, j):
+            run_lengths[k] = run_len
+        i = j
+    return [rl if rl < 5 else '5+' for rl in run_lengths]
+
+
 def create_folder(folder_path):
 
     if not os.path.exists(folder_path):

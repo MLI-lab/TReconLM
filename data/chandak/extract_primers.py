@@ -33,7 +33,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from collections import defaultdict, Counter
-import editdistance
+from Levenshtein import distance as editdistance_eval
 from tqdm import tqdm
 import argparse
 import multiprocessing as mp
@@ -107,7 +107,7 @@ def find_primer_in_region(read_region, primer):
     # Slide window across region
     for i in range(max(0, len(read_region) - primer_len + 1)):
         window = read_region[i:i + primer_len]
-        dist = editdistance.eval(window, primer)
+        dist = editdistance_eval(window, primer)
         if dist < min_dist:
             min_dist = dist
             best_pos = i
@@ -524,11 +524,11 @@ def process_noisy_reads(fastq_file, output_dir, primer_db, num_workers=None):
 
 def main():
     parser = argparse.ArgumentParser(description='Extract primers from DNA storage data')
-    parser.add_argument('--oligo-dir', default='/Users/macpc770036980/DNAEmbedding/Tryout/nanopore_dna_storage_data/oligo_files',
-                        help='Directory containing ground truth oligo files')
-    parser.add_argument('--fastq-file', default='/Users/macpc770036980/DNAEmbedding/Tryout/nanopore_dna_storage_data/fastq/merged.fastq',
-                        help='FASTQ file containing noisy reads')
-    parser.add_argument('--output-dir', default='/Users/macpc770036980/DNAEmbedding/Tryout/processed_data',
+    parser.add_argument('--oligo-dir', required=True,
+                        help='Directory containing ground truth oligo files (e.g. nanopore_dna_storage_data/oligo_files)')
+    parser.add_argument('--fastq-file', required=True,
+                        help='FASTQ file containing noisy reads (e.g. nanopore_dna_storage_data/fastq/merged.fastq)')
+    parser.add_argument('--output-dir', default='data/chandak/processed_data',
                         help='Output directory for processed files')
     parser.add_argument('--num-workers', type=int, default=None,
                         help='Number of parallel workers (default: all CPU cores)')

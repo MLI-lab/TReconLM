@@ -16,6 +16,10 @@ substitution_probability_ub: 0.1
 insertion_probability_ub: 0.1
 deletion_probability_ub:  0.1
 
+# Realistic error model (optional). If not specified or null, uses uniform IDS channel above.
+# When set, the probability lb/ub fields above are ignored.
+error_model_path: null  # e.g. "data/error_model/results_microsoft/error_model.json"
+
 # Misclustering parameters for training
 misclustering_training:
   enabled: false  # Default off for backward compatibility
