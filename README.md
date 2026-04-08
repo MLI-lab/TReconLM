@@ -146,9 +146,9 @@ python data_pkg/data_generation.py
 
 ## Baselines
 
-### Non–deep learning baselines
+### Non-deep learning baselines
 
-To run inference with non–deep learning baselines:
+To run inference with non-deep learning baselines:
 
 ```bash
 python src/eval_pkg/eval_all_baselines.py --alg <algorithm>
