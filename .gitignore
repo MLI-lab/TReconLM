@@ -53,6 +53,7 @@ DeepLearningBaselines/RobuSeqNet/examples/artifacts/
 # --------------------------- All dot files/dirs -------------------------
 .*
 !.gitignore
+!.devcontainer/
 
 # --------------------------- Parquet data files -------------------------
 *.parquet
@@ -74,3 +75,22 @@ data/chandak/test.txt
 data/chandak/val.txt
 data/chandak/data_chandak/
 data/chandak/nanopore_dna_storage_data/
+# --------------------------- TSV output files ---------------------------
+*.tsv
+
+# --------------------------- Robustness results -------------------------
+shuffle_robustness_results/
+
+# --------------------------- DNAFormer data files -----------------------
+data/dnaformer/*.txt
+data/dnaformer/without_index_data/
+
+# --------------------------- Error model results ------------------------
+data/error_model/microsoft/
+data/error_model/results_chandak/
+data/error_model/results_microsoft/
+data/error_model/results_noisy/
+
+# --------------------------- Generated plots ----------------------------
+plots/
+src/plots/

@@ -1,0 +1,29 @@
+{
+    "name": "treconlm",
+    "image": "base/base:treconlm",
+    "initializeCommand": "nvidia-docker build -f .devcontainer/Dockerfile -t base/base:treconlm .",
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "eamodio.gitlens",
+          "ms-python.python",
+          "ms-toolsai.jupyter"
+        ],
+        "settings": {
+          "python.defaultInterpreterPath": "/opt/conda/bin/python"
+        }
+      }
+    },
+    "mounts": [
+      "type=bind,source=${localEnv:HOME},target=/home/${localEnv:USER}",
+      "type=bind,source=/mnt/hdd_pool_zion/users/franziska/,target=/mnt/"
+    ],
+    "runArgs": [
+      "--runtime=nvidia",
+      "--name=treconlm",
+      "--memory=64g",
+      "--cpus=16",
+      "--shm-size=64g"],
+    "shutdownAction": "none",
+    "forwardPorts": [3000]
+}

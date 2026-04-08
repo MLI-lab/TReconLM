@@ -291,6 +291,14 @@ model:
     # Beam search (if strategy: beam_search)
     # beam_width: 6
 
+    # Shuffle reads before inference (for input-ordering robustness evaluation)
+    # Set to an integer to enable. Each example's reads are shuffled using
+    # seed = shuffle_reads_seed + example_index, so every example gets a
+    # different permutation but results are deterministic per seed.
+    # Run with multiple seeds (1, 2, ..., 20) and compare failure rates
+    # to measure sensitivity to input ordering.
+    shuffle_reads_seed: null          # null = disabled, integer = enabled
+
     # Majority voting decoding
     majority_voting:
       enabled: false                  # Enable permutation-based voting
@@ -324,3 +332,21 @@ wandb:
   wandb_log: true
   wandb_project: ${project}
 ```
+
+### Input-Ordering Robustness Evaluation
+
+To measure how sensitive the model is to the ordering of input reads, run inference
+multiple times with different `shuffle_reads_seed` values and compare failure rates:
+
+```bash
+# Run 20 evaluations, each with a different random shuffle of the input reads
+for seed in $(seq 1 20); do
+  python src/inference.py exps=ids_110 model.sampling.shuffle_reads_seed=$seed
+done
+```
+
+Each run shuffles the reads of every example using a deterministic seed
+(`shuffle_reads_seed + example_index`), so each example gets a different
+permutation and each run produces a different global pattern. Compare the
+failure rates and Levenshtein distances across runs, small variance indicates
+robustness to input ordering.

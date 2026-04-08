@@ -12,9 +12,10 @@ import wandb
 _WANDB_ENABLED = True
 
 def wandb_log_safe(data):
-    """Only log to wandb if enabled"""
+    """Print to terminal and log to wandb if enabled"""
+    print(f"[LOG] {data}")
     if _WANDB_ENABLED:
-        wandb_log_safe(data)
+        wandb.log(data)
 import numpy as np
 import math
 from datetime import datetime
@@ -635,6 +636,18 @@ def run_one_batch(chunk, start, batch_size,
     # Update variables to use filtered data
     inputs, gts, alignment_sizes = valid_inputs, valid_gts, valid_alignment_sizes
 
+    # Optionally shuffle reads within each example (for robustness evaluation)
+    shuffle_reads_seed = cfg_dict.get('shuffle_reads_seed', None)
+    if shuffle_reads_seed is not None:
+        shuffled_inputs = []
+        for i, inp in enumerate(inputs):
+            reads_part, gt_part = inp.split(':', 1)
+            reads = reads_part.split('|')
+            if len(reads) > 1:
+                rng = np.random.RandomState(shuffle_reads_seed + start + i)
+                rng.shuffle(reads)
+            shuffled_inputs.append('|'.join(reads) + ':' + gt_part)
+        inputs = shuffled_inputs
 
     # params for GPT_Inference (gpt path only)
     inf_params = {
@@ -1201,6 +1214,13 @@ def run_one_batch_with_majority_voting_batched(
             # Compute diversity metrics
             diversity = compute_pairwise_hamming_distances(predictions)
 
+            # Compute per-permutation Levenshtein to GT (measures quality stability across shuffles)
+            per_perm_levs = [r[9] for r in perm_results]  # lev_full for each permutation
+            per_perm_failures = [1 if lev > 0 else 0 for lev in per_perm_levs]
+            per_perm_lev_mean = float(np.mean(per_perm_levs))
+            per_perm_lev_std = float(np.std(per_perm_levs))
+            per_perm_failure_rate = float(np.mean(per_perm_failures))
+
             # Compute metrics for voted prediction
             from Levenshtein import distance as levenshtein_distance
             from src.utils.hamming_distance import hamming_distance_postprocessed
@@ -1230,6 +1250,7 @@ def run_one_batch_with_majority_voting_batched(
                 write_output(f"  RESCUED FAILURE")
             write_output(f"  Predictions differ by {diversity['mean_pairwise_hamming']:.2f} nucleotides on average (pairwise Hamming)")
             write_output(f"  Vote agreement: mean={vote_stats['mean_agreement']:.3f}, min={vote_stats['min_agreement']:.3f}")
+            write_output(f"  Per-permutation LEV to GT: mean={per_perm_lev_mean:.4f}, std={per_perm_lev_std:.4f}, failure_rate={per_perm_failure_rate:.2%}")
             write_output(f"[GT]    {gt}")
 
             # Print all individual predictions from each permutation
@@ -1267,6 +1288,9 @@ def run_one_batch_with_majority_voting_batched(
                 diversity['std_pairwise_hamming'],      # 21: diversity_std_hamming
                 vote_stats['mean_agreement'],           # 22: vote_mean_agreement
                 vote_stats['min_agreement'],            # 23: vote_min_agreement
+                per_perm_lev_mean,                      # 24: per_perm_lev_mean
+                per_perm_lev_std,                       # 25: per_perm_lev_std
+                per_perm_failure_rate,                  # 26: per_perm_failure_rate
             )
 
             all_results.append(extended_result)
@@ -3574,6 +3598,22 @@ def _main_impl(cfg: DictConfig):
                         f"cross_mode_k={k}": cross_mode
                     })
                 wandb_log_safe(log_dict)
+
+                # Print sweep summary to console
+                failure_rate_cropped = 1 - (success_count_cropped / n_ex)
+                print(f"\n{'='*80}")
+                print(f"SWEEP RESULTS (k={k})")
+                print(f"{'='*80}")
+                print(f"  Examples: {n_ex}")
+                print(f"  Hamming (cropped):     {h_vals_cropped.mean():.3f} ± {h_vals_cropped.std():.3f}")
+                print(f"  Levenshtein (cropped): {l_vals_cropped.mean():.4f} ± {l_vals_cropped.std():.4f}")
+                print(f"  Failure rate (cropped): {failure_rate_cropped:.2%}")
+                if cross_mode:
+                    failure_rate_full = 1 - (success_count_full / n_ex)
+                    print(f"  Hamming (full):        {h_vals_full.mean():.3f} ± {h_vals_full.std():.3f}")
+                    print(f"  Levenshtein (full):    {l_vals_full.mean():.4f} ± {l_vals_full.std():.4f}")
+                    print(f"  Failure rate (full):   {failure_rate_full:.2%}")
+                print(f"{'='*80}\n")
             else:
                 # breakdown by N for both cropped and full metrics
                 count = defaultdict(int)
@@ -3634,6 +3674,41 @@ def _main_impl(cfg: DictConfig):
 
                     wandb_log_safe(metrics_dict)
 
+                # Print per-cluster-size summary to console
+                print(f"\n{'='*80}")
+                print(f"RESULTS BY CLUSTER SIZE (n={n_ex} examples, {total_skipped_all} skipped)")
+                print(f"{'='*80}")
+                for N in sorted(count):
+                    h_arr = np.array(h_per_N_cropped[N])
+                    l_arr = np.array(l_per_N_cropped[N])
+                    sr = success_cropped[N] / count[N]
+                    fr = 1 - sr
+                    line = (f"  N={N:>2}: count={count[N]:>5}, "
+                            f"success={sr:.2%}, failure={fr:.2%}, "
+                            f"HAM={h_arr.mean():.3f}±{h_arr.std():.3f}, "
+                            f"LEV={l_arr.mean():.4f}±{l_arr.std():.4f}")
+                    if cross_mode:
+                        h_arr_f = np.array(h_per_N_full[N])
+                        l_arr_f = np.array(l_per_N_full[N])
+                        sr_f = success_full[N] / count[N]
+                        line += (f"  |  full: success={sr_f:.2%}, "
+                                 f"HAM={h_arr_f.mean():.3f}±{h_arr_f.std():.3f}, "
+                                 f"LEV={l_arr_f.mean():.4f}±{l_arr_f.std():.4f}")
+                    print(line)
+
+                # Print overall summary
+                sr_overall = sum(success_cropped.values()) / n_ex
+                print(f"{'─'*80}")
+                print(f"  Overall: success={sr_overall:.2%}, failure={1 - sr_overall:.2%}, "
+                      f"HAM={h_vals_cropped.mean():.3f}±{h_vals_cropped.std():.3f}, "
+                      f"LEV={l_vals_cropped.mean():.4f}±{l_vals_cropped.std():.4f}")
+                if cross_mode:
+                    sr_full_overall = sum(success_full.values()) / n_ex
+                    print(f"  Overall (full): success={sr_full_overall:.2%}, "
+                          f"HAM={h_vals_full.mean():.3f}±{h_vals_full.std():.3f}, "
+                          f"LEV={l_vals_full.mean():.4f}±{l_vals_full.std():.4f}")
+                print(f"{'='*80}\n")
+
                 # Log majority voting metrics if enabled
                 majority_cfg = cfg.model.sampling.get('majority_voting', {})
                 if majority_cfg.get('enabled', False) and all_results:
@@ -3654,6 +3729,9 @@ def _main_impl(cfg: DictConfig):
                             'failure_rescued': [],
                             'diversity': [],
                             'vote_agreement': [],
+                            'per_perm_lev_mean': [],
+                            'per_perm_lev_std': [],
+                            'per_perm_failure_rate': [],
                         })
 
                         for r in all_results:
@@ -3667,6 +3745,9 @@ def _main_impl(cfg: DictConfig):
                             mv_metrics_by_N[N]['failure_rescued'].append(r[19])
                             mv_metrics_by_N[N]['diversity'].append(r[20])
                             mv_metrics_by_N[N]['vote_agreement'].append(r[22])
+                            mv_metrics_by_N[N]['per_perm_lev_mean'].append(r[24])
+                            mv_metrics_by_N[N]['per_perm_lev_std'].append(r[25])
+                            mv_metrics_by_N[N]['per_perm_failure_rate'].append(r[26])
 
                         # Log per-cluster-size majority voting metrics
                         for N in sorted(mv_metrics_by_N.keys()):
@@ -3695,6 +3776,11 @@ def _main_impl(cfg: DictConfig):
                             print(f"  Improvement:      LEV={lev_improvement_arr.mean():+.4f}, Rescued={rescued_failures_frac:.2%}")
                             print(f"  Diversity:        Hamming={diversity_arr.mean():.2f}")
 
+                            per_perm_lev_mean_arr = np.array(metrics['per_perm_lev_mean'])
+                            per_perm_lev_std_arr = np.array(metrics['per_perm_lev_std'])
+                            per_perm_failure_rate_arr = np.array(metrics['per_perm_failure_rate'])
+                            print(f"  Per-permutation:  LEV={per_perm_lev_mean_arr.mean():.4f}±{per_perm_lev_std_arr.mean():.4f}, Failure rate={per_perm_failure_rate_arr.mean():.2%}±{np.std(per_perm_failure_rate_arr):.2%}")
+
                             mv_log = {
                                 # Raw performance
                                 f'majority_voting_first_levenshtein_N={N}': float(first_lev_arr.mean()),
@@ -3710,6 +3796,12 @@ def _main_impl(cfg: DictConfig):
                                 f'majority_voting_diversity_N={N}': float(diversity_arr.mean()),
                                 f'majority_voting_vote_agreement_N={N}': float(vote_agreement_arr.mean()),
                                 f'majority_voting_num_perms_N={N}': num_perms,
+
+                                # Per-permutation robustness
+                                f'majority_voting_per_perm_lev_mean_N={N}': float(per_perm_lev_mean_arr.mean()),
+                                f'majority_voting_per_perm_lev_std_N={N}': float(per_perm_lev_std_arr.mean()),
+                                f'majority_voting_per_perm_failure_rate_N={N}': float(per_perm_failure_rate_arr.mean()),
+                                f'majority_voting_per_perm_failure_rate_std_N={N}': float(np.std(per_perm_failure_rate_arr)),
                             }
                             wandb_log_safe(mv_log)
 
@@ -3722,6 +3814,9 @@ def _main_impl(cfg: DictConfig):
                         all_failure_rescued = np.array([r[19] for r in all_results])
                         all_diversity = np.array([r[20] for r in all_results])
                         all_vote_agreement = np.array([r[22] for r in all_results])
+                        all_per_perm_lev_mean = np.array([r[24] for r in all_results])
+                        all_per_perm_lev_std = np.array([r[25] for r in all_results])
+                        all_per_perm_failure_rate = np.array([r[26] for r in all_results])
 
                         overall_first_failure_rate = all_first_failed.mean()
                         overall_voted_failure_rate = all_voted_failed.mean()
@@ -3737,6 +3832,7 @@ def _main_impl(cfg: DictConfig):
                         print(f"Rescued failures: {overall_rescued_frac:.2%}")
                         print(f"Mean diversity:   {all_diversity.mean():.2f} Hamming distance between predictions")
                         print(f"Mean vote agreement: {all_vote_agreement.mean():.3f}")
+                        print(f"Per-permutation:  LEV={all_per_perm_lev_mean.mean():.4f}±{all_per_perm_lev_std.mean():.4f}, Failure rate={all_per_perm_failure_rate.mean():.2%}±{np.std(all_per_perm_failure_rate):.2%}")
                         print(f"Voting helped in: {(all_lev_improvement > 0).mean():.1%} of cases")
                         print(f"{'='*80}\n")
 
@@ -3751,6 +3847,12 @@ def _main_impl(cfg: DictConfig):
                             'majority_voting_diversity_all': float(all_diversity.mean()),
                             'majority_voting_vote_agreement_all': float(all_vote_agreement.mean()),
                             'majority_voting_helped_rate_all': float((all_lev_improvement > 0).mean()),
+
+                            # Per-permutation robustness
+                            'majority_voting_per_perm_lev_mean_all': float(all_per_perm_lev_mean.mean()),
+                            'majority_voting_per_perm_lev_std_all': float(all_per_perm_lev_std.mean()),
+                            'majority_voting_per_perm_failure_rate_all': float(all_per_perm_failure_rate.mean()),
+                            'majority_voting_per_perm_failure_rate_std_all': float(np.std(all_per_perm_failure_rate)),
                         }
                         wandb_log_safe(mv_overall_log)
 

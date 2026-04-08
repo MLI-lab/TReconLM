@@ -328,8 +328,9 @@ def save_contaminated_attention_data(attention_sequence, read_boundaries, token_
 
 
 def weighted_choice(items, weights, rng):
-    """Choose from items with given weights (must sum to 1)."""
-    rd = rng.uniform(0.0, 1.0)
+    """Choose from items with given weights (normalized internally)."""
+    total = sum(weights)
+    rd = rng.uniform(0.0, total)
     cum = 0.0
     for item, w in zip(items, weights):
         cum += w

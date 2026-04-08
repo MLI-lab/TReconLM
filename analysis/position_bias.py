@@ -463,9 +463,9 @@ def plot_positional_bias(test_files, output_path='./plots/positional_bias.pdf'):
 if __name__ == "__main__":
     # Set your prediction output file paths
     test_files = {
-        'synthetic': '',  # path to synthetic predictions_output.tsv
-        'microsoft': '',  # path to microsoft predictions_output.tsv
-        'noisy_dna': ''   # path to noisy_dna predictions_output.tsv
+        'synthetic': '/mnt/TReconLM/pred_gt/synthetic_L110/predictions_output.tsv',  # path to synthetic predictions_output.tsv
+        'microsoft': '/mnt/TReconLM/pred_gt/finetune_microsoft/predictions_output.tsv',  # path to microsoft predictions_output.tsv
+        'noisy_dna': '/mnt/TReconLM/pred_gt/finetune_noisy/predictions_output.tsv'   # path to noisy_dna predictions_output.tsv
     }
 
     # Run text analysis

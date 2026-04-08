@@ -14,7 +14,7 @@ sys.path.insert(0, "/workspaces/TReconLM")
 from src.utils.hamming_distance import hamming_distance_postprocessed
 
 # --- Settings ---
-fontsize = 9
+fontsize = 11.2
 plt.rcParams.update({
     'text.usetex': True,
     'font.family': 'serif',
@@ -25,7 +25,7 @@ plt.rcParams.update({
 
 save_dir = "./plots"
 download_dir = "./downloaded_artifact"
-entity = "<your.wandb.entity>"
+entity = "franziweindel-technical-university-of-munich"
 project_wandb = "TRACE_RECONSTRUCTION"
 project_gpt_mini = "GPTMini"  # WandB project containing GPT-4o mini and GPT-5 runs
 os.makedirs(save_dir, exist_ok=True)
@@ -285,7 +285,7 @@ def load_gpt5_metrics(project_name):
     return gpt5_metrics
 
 def plot_combined(metrics, gpt_data, gpt_cot_data, gpt5_data, noisy_robu, noisy_gpt, plot_noisy_baselines=False):
-    fig, axs = plt.subplots(1, 2, figsize=(6, 1.3), dpi=300, gridspec_kw={'wspace': 0.4})
+    fig, axs = plt.subplots(1, 2, figsize=(7.7, 1.37), dpi=300, gridspec_kw={'wspace': 0.4})
     Ns_left = list(range(2, 11))
     Ns_right = [2, 5, 10]
 
@@ -456,7 +456,7 @@ def plot_combined(metrics, gpt_data, gpt_cot_data, gpt5_data, noisy_robu, noisy_
         loc='upper center',
         ncol=len(all_handles),
         bbox_to_anchor=(0.5, 1.17),
-        fontsize=8,
+        fontsize=10.2,
         handletextpad=0.3,
         columnspacing=0.6,
         handlelength=1.0,

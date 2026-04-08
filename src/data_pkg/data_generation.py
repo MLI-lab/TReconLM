@@ -2,6 +2,7 @@ import random
 import numpy as np
 import torch
 import pickle
+import warnings
 
 import string
 from collections import Counter
@@ -13,7 +14,7 @@ import json
 
 import wandb
 
-from ..data_pkg.IDS_channel import IDS_alignment_channel, IDS_channel, realistic_IDS_channel
+from ..data_pkg.IDS_channel import IDS_alignment_channel, IDS_channel, error_model_IDS_channel
 
 from ..utils.data_functions import write_data_to_file
 from ..utils.sys_functions import get_available_memory
@@ -581,7 +582,7 @@ def load_error_model(path):
     - Substitution matrix into per-base weighted sampling distributions
 
     Returns:
-        dict: Error model ready for use with realistic_IDS_channel().
+        dict: Error model ready for use with error_model_IDS_channel().
     """
     with open(path) as f:
         model = json.load(f)
@@ -589,7 +590,62 @@ def load_error_model(path):
     return model
 
 
-def data_generation_with_error_model(error_model, observation_size, length_ground_truth, target_type, rng=None):
+def _sample_error_rates(error_model, gt_len, method, rng):
+    """
+    Sample per-read (sub_rate, del_rate, ins_rate) using the specified method.
+
+    Methods:
+        'fixed': Use the overall estimated rates (current default behavior).
+        'beta': Sample from fitted Beta distributions (independent per error type).
+        'histogram': Sample from the joint empirical histogram (preserves correlations).
+
+    Returns:
+        (sub_rate, del_rate, ins_rate) tuple of floats.
+    """
+    if method == 'beta':
+        beta_dist = error_model.get('per_read_beta_distribution', {})
+        rates = {}
+        for err_type in ('sub', 'del', 'ins'):
+            params = beta_dist.get(err_type, {'a': 1.0, 'b': 1.0})
+            # Sample from Beta(a, b) and clamp
+            val = np.random.default_rng(rng.randint(0, 2**31)).beta(params['a'], params['b'])
+            rates[err_type] = max(0.0, float(val))
+        return rates['sub'], rates['del'], rates['ins']
+
+    elif method == 'histogram':
+        joint_hist = error_model.get('joint_error_histogram', {})
+        hist_gt_len = error_model.get('joint_error_histogram_gt_len', gt_len)
+        if not joint_hist:
+            # Fallback to fixed
+            overall = error_model['overall']
+            return overall['sub_rate'], overall['del_rate'], overall['ins_rate']
+
+        # Sample a (n_sub, n_del, n_ins) tuple proportional to counts
+        keys = list(joint_hist.keys())
+        counts = [joint_hist[k] for k in keys]
+        total = sum(counts)
+        r = rng.random() * total
+        cumsum = 0
+        chosen_key = keys[0]
+        for k, c in zip(keys, counts):
+            cumsum += c
+            if cumsum >= r:
+                chosen_key = k
+                break
+
+        n_sub, n_del, n_ins = [int(x) for x in chosen_key.split(',')]
+        # Normalize by histogram GT length, then scale to actual GT length
+        sub_rate = n_sub / hist_gt_len
+        del_rate = n_del / hist_gt_len
+        ins_rate = n_ins / hist_gt_len
+        return sub_rate, del_rate, ins_rate
+
+    else:  # 'fixed'
+        overall = error_model['overall']
+        return overall['sub_rate'], overall['del_rate'], overall['ins_rate']
+
+
+def data_generation_with_error_model(error_model, observation_size, length_ground_truth, target_type, rng=None, error_rate_sampling='fixed'):
     """
     Generate one synthetic training example using a realistic error model estimated
     from real-world data.
@@ -607,6 +663,10 @@ def data_generation_with_error_model(error_model, observation_size, length_groun
         length_ground_truth: Length of GT (int or [min, max] for variable length).
         target_type (str): Must be 'CPRED'.
         rng: Random number generator.
+        error_rate_sampling (str): How to sample per-read error rates.
+            'fixed': use overall estimated rates (default, current behavior).
+            'beta': sample from fitted Beta distributions per read.
+            'histogram': sample from joint empirical histogram per read.
 
     Returns:
         List[List[str]]: Same format as data_generation():
@@ -627,8 +687,6 @@ def data_generation_with_error_model(error_model, observation_size, length_groun
     gt = ''.join(weighted_choice(bases, weights, rng) for _ in range(sampled_length))
 
     # Precompute context for this GT (once, shared across all reads)
-    gc_frac = (gt.count('G') + gt.count('C')) / len(gt)
-    gc_bin = 'low' if gc_frac < 0.30 else ('high' if gc_frac > 0.70 else 'mid')
     homo_map = compute_homopolymer_map(gt)
 
     # Read length bounds from real data (if available in error model)
@@ -637,13 +695,44 @@ def data_generation_with_error_model(error_model, observation_size, length_groun
     read_len_max = error_model.get('read_length_max', float('inf'))
     max_retries = 10
 
+    # Misclustering rate from error model (0 if not estimated)
+    misclustering_rate = error_model.get('misclustering_rate', 0.0)
+
     # Generate N noisy reads
     observation_list = []
     for _ in range(observation_size):
-        for attempt in range(max_retries):
-            noisy_read = realistic_IDS_channel(gt, error_model, gc_bin, homo_map, rng)
-            if read_len_min <= len(noisy_read) <= read_len_max:
-                break
+        if misclustering_rate > 0 and rng.random() < misclustering_rate:
+            # Misclustered read: generate from a random different GT
+            wrong_gt = ''.join(weighted_choice(bases, weights, rng) for _ in range(sampled_length))
+            wrong_homo_map = compute_homopolymer_map(wrong_gt)
+            sampled_sub, sampled_del, sampled_ins = _sample_error_rates(
+                error_model, sampled_length, error_rate_sampling, rng)
+            n_sub = round(sampled_sub * sampled_length)
+            n_del = round(sampled_del * sampled_length)
+            n_ins = round(sampled_ins * sampled_length)
+            for attempt in range(max_retries):
+                noisy_read = error_model_IDS_channel(
+                    wrong_gt, n_sub, n_del, n_ins, error_model, wrong_homo_map, rng)
+                if read_len_min <= len(noisy_read) <= read_len_max:
+                    break
+        else:
+            # Normal read: corrupt from the correct GT
+            sampled_sub, sampled_del, sampled_ins = _sample_error_rates(
+                error_model, sampled_length, error_rate_sampling, rng)
+            n_sub = round(sampled_sub * sampled_length)
+            n_del = round(sampled_del * sampled_length)
+            n_ins = round(sampled_ins * sampled_length)
+            for attempt in range(max_retries):
+                noisy_read = error_model_IDS_channel(
+                    gt, n_sub, n_del, n_ins, error_model, homo_map, rng)
+                if read_len_min <= len(noisy_read) <= read_len_max:
+                    break
+        if not (read_len_min <= len(noisy_read) <= read_len_max):
+            warnings.warn(
+                f"Read length {len(noisy_read)} outside bounds [{read_len_min}, {read_len_max}] "
+                f"after {max_retries} retries (gt_len={sampled_length}), using anyway",
+                stacklevel=2,
+            )
         observation_list.append(noisy_read)
 
     # Format output (same as data_generation for CPRED)

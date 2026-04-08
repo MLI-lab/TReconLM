@@ -15,16 +15,180 @@ import wandb
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 
-# Import from original script
-from plot_misclustering_heatmap import (
-    fetch_from_wandb,
-    process_results_to_matrices,
-    BASELINE_LEVENSHTEIN_BY_CLUSTER,
-    truncate_colormap
-)
+
+def truncate_colormap(cmap, minval=0.1, maxval=1.0, n=100):
+    """Truncate colormap to skip lightest colors."""
+    new_cmap = LinearSegmentedColormap.from_list(
+        f"trunc({cmap.name},{minval},{maxval})",
+        cmap(np.linspace(minval, maxval, n))
+    )
+    return new_cmap
+
+
+# Baseline Levenshtein per cluster size (no misclustering).
+# These are subtracted so the heatmap shows the *increase* caused by misclustering.
+# Update with your own baseline values if needed.
+BASELINE_LEVENSHTEIN_BY_CLUSTER = {
+    2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0,
+    6: 0.0, 7: 0.0, 8: 0.0, 9: 0.0, 10: 0.0,
+}
+
+
+def fetch_from_wandb(entity, project, run_id):
+    """
+    Fetch misclustering experiment results from a W&B run summary.
+
+    Returns a dict with:
+      - 'results_by_condition': {condition_name: {'mean_levenshtein': float, ...}}
+      - 'contamination_rates': list of floats
+      - 'cluster_size_matrices': dict with 2D matrices keyed by cluster size
+        (levenshtein_matrix, counts_matrix, contamination_rates, cluster_sizes)
+    """
+    wandb.login()
+    api = wandb.Api()
+    run = api.run(f"{entity}/{project}/{run_id}")
+    summary = dict(run.summary)
+
+    # ── Try to grab pre-built cluster-size 2D matrices first ──
+    cs_lev = summary.get('misclustering_cluster_size_levenshtein_matrix')
+    cs_counts = summary.get('misclustering_cluster_size_counts_matrix')
+    cs_rates = summary.get('misclustering_cluster_size_contamination_rates')
+    cs_sizes = summary.get('misclustering_cluster_size_cluster_sizes')
+
+    if cs_lev is not None:
+        return {
+            'source': 'cluster_size_matrices',
+            'levenshtein_matrix': np.array(cs_lev, dtype=float),
+            'counts_matrix': np.array(cs_counts, dtype=float),
+            'contamination_rates': cs_rates,
+            'cluster_sizes': cs_sizes,
+        }
+
+    # ── Fallback: reconstruct from per-condition / per-cluster keys ──
+    import re
+
+    # Collect all per-condition, per-cluster-size metrics
+    # Keys look like: misclustering_{condition}_N{N}_mean_levenshtein
+    #   where condition encodes the contamination rate, e.g. "cont_0.02_cs10"
+    per_condition = defaultdict(dict)
+    contamination_rates_set = set()
+    cluster_sizes_set = set()
+
+    pattern = re.compile(
+        r'^misclustering_(.+?)_N(\d+)_mean_levenshtein$'
+    )
+    for key, val in summary.items():
+        m = pattern.match(key)
+        if m:
+            condition = m.group(1)
+            N = int(m.group(2))
+            per_condition[(condition, N)]['mean_levenshtein'] = float(val)
+
+    # Also grab contaminated-only levenshtein
+    pattern_cont = re.compile(
+        r'^misclustering_(.+?)_N(\d+)_contaminated_mean_levenshtein$'
+    )
+    for key, val in summary.items():
+        m = pattern_cont.match(key)
+        if m:
+            condition = m.group(1)
+            N = int(m.group(2))
+            per_condition[(condition, N)]['contaminated_mean_levenshtein'] = float(val)
+
+    # Parse contamination rate from condition name (e.g. "cont_0.02" or "rate_0.02_...")
+    rate_re = re.compile(r'(?:cont|rate)[_=]?([\d.]+)')
+    for (condition, N), _ in per_condition.items():
+        rm = rate_re.search(condition)
+        if rm:
+            contamination_rates_set.add(float(rm.group(1)))
+        cluster_sizes_set.add(N)
+
+    return {
+        'source': 'per_condition',
+        'per_condition': per_condition,
+        'contamination_rates_set': contamination_rates_set,
+        'cluster_sizes_set': cluster_sizes_set,
+        'raw_summary': summary,
+    }
+
+
+def process_results_to_matrices(results):
+    """
+    Convert fetched W&B results into the matrix dict expected by the plotting code.
+
+    Returns dict with keys:
+      - levenshtein_matrix:                shape (n_clusters, n_rates)
+      - contaminated_levenshtein_matrix:   shape (n_clusters, n_rates)
+      - counts_matrix:                     shape (n_clusters, n_rates)
+      - avg_contaminants_all_matrix:       shape (n_clusters, n_rates)
+      - avg_contaminants_contaminated_matrix: shape (n_clusters, n_rates)
+      - bin_labels:          list of str  (cluster sizes)
+      - contamination_rates: list of float
+    """
+    if results is None:
+        return None
+
+    # ── Pre-built matrices from W&B ──
+    if results.get('source') == 'cluster_size_matrices':
+        lev = np.array(results['levenshtein_matrix'], dtype=float)
+        counts = np.array(results['counts_matrix'], dtype=float)
+        rates = [float(r) for r in results['contamination_rates']]
+        sizes = [str(int(s)) for s in results['cluster_sizes']]
+        return {
+            'levenshtein_matrix': lev,
+            'contaminated_levenshtein_matrix': lev.copy(),
+            'counts_matrix': counts,
+            'avg_contaminants_all_matrix': np.zeros_like(lev),
+            'avg_contaminants_contaminated_matrix': np.zeros_like(lev),
+            'bin_labels': sizes,
+            'contamination_rates': rates,
+        }
+
+    # ── Reconstruct from per-condition keys ──
+    import re
+    per_condition = results['per_condition']
+    contamination_rates = sorted(results['contamination_rates_set'])
+    cluster_sizes = sorted(results['cluster_sizes_set'])
+
+    n_clusters = len(cluster_sizes)
+    n_rates = len(contamination_rates)
+
+    lev_all = np.full((n_clusters, n_rates), np.nan)
+    lev_cont = np.full((n_clusters, n_rates), np.nan)
+    counts = np.ones((n_clusters, n_rates))
+
+    rate_re = re.compile(r'(?:cont|rate)[_=]?([\d.]+)')
+
+    for (condition, N), metrics in per_condition.items():
+        rm = rate_re.search(condition)
+        if not rm:
+            continue
+        rate = float(rm.group(1))
+        if rate not in contamination_rates or N not in cluster_sizes:
+            continue
+        ri = contamination_rates.index(rate)
+        ci = cluster_sizes.index(N)
+        if 'mean_levenshtein' in metrics:
+            lev_all[ci, ri] = metrics['mean_levenshtein']
+        if 'contaminated_mean_levenshtein' in metrics:
+            lev_cont[ci, ri] = metrics['contaminated_mean_levenshtein']
+
+    # Where contaminated is missing, fall back to all
+    mask = np.isnan(lev_cont)
+    lev_cont[mask] = lev_all[mask]
+
+    return {
+        'levenshtein_matrix': lev_all,
+        'contaminated_levenshtein_matrix': lev_cont,
+        'counts_matrix': counts,
+        'avg_contaminants_all_matrix': np.zeros_like(lev_all),
+        'avg_contaminants_contaminated_matrix': np.zeros_like(lev_all),
+        'bin_labels': [str(s) for s in cluster_sizes],
+        'contamination_rates': contamination_rates,
+    }
 
 # Font size configuration
-fontsize = 15.5
+fontsize = 13
 
 plt.rcParams.update({
     'text.usetex': True,
@@ -39,10 +203,10 @@ plt.rcParams.update({
 # 
 
 # WandB settings
-ENTITY = ""  # your wandb entity (e.g., "<your.wandb.entity>")
-PROJECT = ""  # your wandb project name (e.g., "Misclustering")
-RUN_ID_1 = ""  # first run id (e.g., "6f93r3di")
-RUN_ID_2 = ""  # second run id (e.g., "4118jgqw")
+ENTITY = "franziweindel-technical-university-of-munich"  # your wandb entity (e.g., "<your.wandb.entity>")
+PROJECT = "Misclustering"  # your wandb project name (e.g., "Misclustering")
+RUN_ID_1 = "6f93r3di"  # first run id (e.g., "6f93r3di")
+RUN_ID_2 = "4118jgqw"  # second run id (e.g., "4118jgqw")
 
 # Output settings
 SAVE_DIR = "./plots"

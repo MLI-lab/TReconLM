@@ -8,6 +8,10 @@ sampling:
   max_new_tokens: 110
   strategy: greedy # greedy, beam_search
 
+  # Shuffle reads with a fixed seed before inference (for robustness evaluation)
+  # Set to a non-null integer to enable. Run with different seeds to measure variance.
+  shuffle_reads_seed: null
+
   # Majority voting ensemble (permutation-based inference)
   majority_voting:
     enabled: false

@@ -8,6 +8,7 @@ project: 'FinetuneMicrosoft'
 experiment: 'finetune_microsoft_seed1' 
 
 data: 
+  local_data_dir: /workspaces/TReconLM/data/microsoft_data/data_microsoft # prioritized over artifact name 
   artifact_name: Microsoft-test-20250721_160309
   ground_truth_length: 110 
   block_size: 1500
@@ -19,7 +20,7 @@ data:
 
 
 model: 
-  checkpoint_path: <your.storage.path>/model_checkpoints/FinetuneMicrosoft/microsoft_data_nuc_CPRED_observation_size_10_ground_truth_110/finetune_microsoft_seed1/train_run_gpt_20250918_210827/checkpoint_best.pt
+  checkpoint_path: /mnt/model_checkpoints/FinetuneMicrosoft/microsoft_data_nuc_CPRED_observation_size_10_ground_truth_110/finetune_microsoft_lr1e5_warmup5_d01_b25/train_run_gpt_20250803_184154/checkpoint_best.pt
   sampling:
     temperature: 1.0
     top_k: None
@@ -35,5 +36,5 @@ model:
     entropy_analysis: false
     log_entropy_details: false  # Set to true for per-example entropy logging
     # Sequence output parameters
-    save_sequences: true  # Set to true to save GT and predictions for failure analysis
+    save_sequences: false  # Set to true to save GT and predictions for failure analysis
     sequence_output_file: "<your.storage.path>/pred_gt/finetune_microsoft/predictions_output.tsv"  # File to save sequences

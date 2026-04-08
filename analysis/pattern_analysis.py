@@ -174,22 +174,56 @@ def analyze_pattern_errors(filepath, window_sizes=[3, 5, 7], min_count=20):
                 rate = count / total_errors
                 print(f"  {error_type.capitalize():12s}: {count:,} ({rate:.1%})")
 
-        print(f"\nTop 10 significant error-prone patterns:")
+        # Top 10 hardest (highest enrichment), including ties at rank 10
+        print(f"\nTop hardest patterns (highest error enrichment, min 10 + ties):")
         print(f"  {'Rank':<5} {'Pattern':<{window_size+2}} {'Enrich':<8} {'p_adj':<10} {'N':<8} {'Errors':<8}")
         print(f"  {'-'*5} {'-'*(window_size+2)} {'-'*8} {'-'*10} {'-'*8} {'-'*8}")
 
-        for i, p in enumerate(significant_patterns[:10]):
+        cutoff_enrich = significant_patterns[9]['enrichment'] if len(significant_patterns) >= 10 else None
+        for i, p in enumerate(significant_patterns):
+            if i >= 10 and (cutoff_enrich is None or p['enrichment'] < cutoff_enrich):
+                break
             print(f"  {i+1:<5} '{p['pattern']}'  {p['enrichment']:>6.2f}x  {p['p_adjusted']:>8.4f}  "
                   f"{p['N_pattern']:>6}  {p['E_pattern']:>6}")
 
-        # Show some filtered patterns
-        if len(patterns_filtered) > 0:
-            print(f"\nTop 5 filtered patterns (N < {min_count}, not tested):")
-            print(f"  {'Pattern':<{window_size+2}} {'Enrich':<8} {'N':<8} {'Errors':<8}")
-            print(f"  {'-'*(window_size+2)} {'-'*8} {'-'*8} {'-'*8}")
-            
-            for p in patterns_filtered[:5]:
-                print(f"  '{p['pattern']}'  {p['enrichment']:>6.2f}x  {p['N_pattern']:>6}  {p['E_pattern']:>6}")
+        # Pattern class enrichment analysis
+        # Classify each k-mer by its repeat structure, e.g. for 3-mers:
+        #   XXX (all same), XXY (first two same), XYX (ends same), XYY (last two same), XYZ (all different)
+        def get_pattern_class(pattern):
+            """Map a k-mer to its abstract class like XXY, XYZ, etc."""
+            mapping = {}
+            next_label = 0
+            labels = []
+            for ch in pattern:
+                if ch not in mapping:
+                    mapping[ch] = next_label
+                    next_label += 1
+                labels.append(mapping[ch])
+            return ''.join(chr(ord('X') + l) for l in labels)
+
+        # Group tested patterns by class
+        class_patterns = defaultdict(list)
+        for p in patterns_to_test:
+            cls = get_pattern_class(p['pattern'])
+            class_patterns[cls].append(p)
+
+        print(f"\nPattern class enrichment:")
+        print(f"  {'Class':<10} {'#Types':<8} {'N':>10} {'Errors':>10} {'Rate':>10} {'Enrich':>8}")
+        print(f"  {'-'*10} {'-'*8} {'-'*10} {'-'*10} {'-'*10} {'-'*8}")
+
+        class_stats = []
+        for cls in sorted(class_patterns.keys()):
+            pats = class_patterns[cls]
+            cls_N = sum(p['N_pattern'] for p in pats)
+            cls_E = sum(p['E_pattern'] for p in pats)
+            cls_rate = cls_E / cls_N if cls_N > 0 else 0
+            cls_enrich = cls_rate / r_overall if r_overall > 0 else 0
+            class_stats.append((cls, len(pats), cls_N, cls_E, cls_rate, cls_enrich))
+
+        # Sort by enrichment descending
+        class_stats.sort(key=lambda x: x[5], reverse=True)
+        for cls, n_types, cls_N, cls_E, cls_rate, cls_enrich in class_stats:
+            print(f"  {cls:<10} {n_types:<8} {cls_N:>10,} {cls_E:>10,} {cls_rate:>10.3%} {cls_enrich:>7.2f}x")
     
     return results
 
@@ -253,7 +287,7 @@ def generate_latex_table_with_stats(results_dict):
 if __name__ == "__main__":
     # Set your prediction output file path
     test_files = {
-        'synthetic': '',  # path to predictions_output.tsv (e.g., '/mnt/.../synthetic_L110/predictions_output.tsv')
+        'synthetic': '/mnt/TReconLM/pred_gt/synthetic_L110/predictions_output.tsv',  # path to predictions_output.tsv (e.g., '/mnt/.../synthetic_L110/predictions_output.tsv')
     }
 
     all_results = {}

@@ -17,9 +17,9 @@ general:
   results_path: <your.storage.path>
   
 wandb:
-  wandb_log: false
+  wandb_log: true
   wandb_project: ${project}
-  wandb_entity: <your.wandb.entity>
+  wandb_entity: franziweindel-technical-university-of-munich
 
 # Logit margin profiling configuration
 # When enabled, computes the gap between top-1 and top-2 logits during generation

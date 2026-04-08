@@ -8,7 +8,7 @@ import numpy as np
 import os
 
 # LaTeX style settings (matching your paper style)
-fontsize = 7.7
+fontsize = 7
 plt.rcParams.update({
     'text.usetex': True,
     'font.family': 'serif',
@@ -19,9 +19,9 @@ plt.rcParams.update({
 
 # Set your position metrics file paths
 compute_budgets = {
-    '6e17': '',  # path to position_metrics parquet file for 6e17 FLOPs
-    '1e18': '',  # path to position_metrics parquet file for 1e18 FLOPs
-    '3e18': '',  # path to position_metrics parquet file for 3e18 FLOPs
+    '6e17': '/workspaces/TReconLM/position_metrics_6e17.parquet',  # path to position_metrics parquet file for 6e17 FLOPs
+    '1e18': '/workspaces/TReconLM/position_metrics_1e18.parquet',  # path to position_metrics parquet file for 1e18 FLOPs
+    '3e18': '/workspaces/TReconLM/position_metrics_3e18.parquet',  # path to position_metrics parquet file for 3e18 FLOPs
 }
 
 # Labels for legend
@@ -121,7 +121,7 @@ def plot_multi_compute_budgets(compute_data, save_path="vote_margin_multi_comput
         for spine in ax.spines.values():
             spine.set_color('lightgray')
         ax.tick_params(axis='both', which='both', color='lightgray', labelcolor='black')
-        ax.grid(True, which='both', ls='--', lw=0.3)
+        ax.grid(False)
     
     # Tight layout and save
     fig.tight_layout()

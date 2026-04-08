@@ -30,3 +30,4 @@ tabulate
 seaborn
 bitsandbytes
 biopython
+edlib

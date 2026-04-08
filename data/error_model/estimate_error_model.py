@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Estimate error model from real-world DNA storage data.
+Estimate error model from real-world DNA storage data. Need to run pip install edlib first
 
 Usage:
     python data/error_model/estimate_error_model.py data/microsoft_data/data_microsoft/train.txt
@@ -37,6 +37,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
+from sklearn.mixture import GaussianMixture
 
 # Add repo root to path so we can import from src/
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -121,6 +122,10 @@ def collect_statistics(examples):
     # Substitution matrix: from_base -> to_base -> count
     sub_matrix = {b: {b2: 0 for b2 in BASES} for b in BASES} # sub_matrix['A']['G'] = X means "A was substituted to G X times across all reads
 
+    # Insertion matrix: ref_base -> inserted_base -> count
+    # ref_base is the nearest GT base at the insertion position
+    ins_matrix = {b: {b2: 0 for b2 in BASES} for b in BASES}
+
     # Per-nucleotide counts: base -> {matches, subs, dels, ins, total}
     per_nt = {b: {'matches': 0, 'subs': 0, 'dels': 0, 'ins': 0, 'total': 0} for b in BASES}
 
@@ -146,6 +151,7 @@ def collect_statistics(examples):
 
     # Edit distance distribution
     edit_distances = []
+    norm_edit_distances = []
 
     # Position-dependent nucleotide frequencies in ground truth
     # pos -> base -> count (for generating realistic synthetic GTs)
@@ -172,9 +178,11 @@ def collect_statistics(examples):
             read_lengths.append(len(read))
             ops = align_read_to_gt(read, gt)
 
-            # Edit distance
+            # Edit distance (raw and normalized)
             n_errors = sum(1 for op, _, _ in ops if op != '=')
             edit_distances.append(n_errors)
+            norm_edit_dist = n_errors / gt_len if gt_len > 0 else 0
+            norm_edit_distances.append(norm_edit_dist)
 
             # GC content per-error-type rates (gc_frac already computed above per GT)
             n_sub = sum(1 for op, _, _ in ops if op == 'X')
@@ -249,6 +257,9 @@ def collect_statistics(examples):
                     else:
                         ref_base = 'A'
                     per_nt[ref_base]['ins'] += 1
+                    # Track which base was inserted (conditioned on ref base)
+                    if read_base in BASES:
+                        ins_matrix[ref_base][read_base] += 1
                     if gt_pos < len(gt):
                         pos_stats[gt_pos]['ins'] += 1
                     # Homopolymer: attribute to nearest gt position
@@ -270,6 +281,7 @@ def collect_statistics(examples):
         'total_ins': total_ins,
         'total_bases': total_bases,
         'sub_matrix': sub_matrix,
+        'ins_matrix': ins_matrix,
         'per_nt': per_nt,
         'pos_stats': dict(pos_stats),
         'homo_stats': homo_stats,
@@ -279,6 +291,7 @@ def collect_statistics(examples):
         'gc_error_data': gc_error_data,
         'read_lengths': read_lengths,
         'edit_distances': edit_distances,
+        'norm_edit_distances': norm_edit_distances,
         'gt_pos_nt': dict(gt_pos_nt),
         'joint_stats': dict(joint_stats),
     }
@@ -344,6 +357,9 @@ def chi2_test_rates(counts_dict):
     table = np.array([observed_errors, observed_ok])
     if table.min() < 0 or table.sum() == 0:
         return 0.0, 1.0
+    # Guard against zero rows/cols (e.g. very low error rates on short sequences)
+    if np.any(table.sum(axis=0) == 0) or np.any(table.sum(axis=1) == 0):
+        return 0.0, 1.0
     chi2, p, _, _ = stats.chi2_contingency(table)
     return chi2, p
 
@@ -352,7 +368,7 @@ def chi2_test_rates(counts_dict):
 # Reporting
 # ============================================================
 
-def print_report(s, output_dir):
+def print_report(s, output_dir, _misclustering=None, _misclustering_rate=0.0):
     """Print summary and save JSON."""
     total = s['total_bases']
     total_with_ins = total + s['total_ins']
@@ -460,7 +476,10 @@ def print_report(s, output_dir):
             ratio = rate_hp / rate_ref if rate_ref > 0 else float('inf')
             table = np.array([[h[err_type], t - h[err_type]],
                               [ref[err_type], ref_total - ref[err_type]]])
-            _, p = stats.chi2_contingency(table)[:2]
+            if np.any(table.sum(axis=0) == 0) or np.any(table.sum(axis=1) == 0):
+                p = 1.0
+            else:
+                _, p = stats.chi2_contingency(table)[:2]
             sig = '***' if p < 0.001 else '**' if p < 0.01 else '*' if p < 0.05 else 'n.s.'
             print(f"    hp={str(lb):>3s} {err_type:>4s}: {rate_hp:.4%} vs {rate_ref:.4%} (ratio={ratio:.2f}x, p={p:.2e} {sig})")
 
@@ -626,7 +645,7 @@ def print_report(s, output_dir):
             break
 
     # Save JSON
-    save_json(s, output_dir)
+    save_json(s, output_dir, misclustering=_misclustering, misclustering_rate=_misclustering_rate)
 
 
 def _compute_hp_multipliers(s):
@@ -735,6 +754,23 @@ def _compute_sub_weights(s):
     return result
 
 
+def _compute_ins_weights(s):
+    """Convert insertion matrix counts into per-ref-base sampling weights.
+
+    For each reference base, compute the probability distribution over which
+    base gets inserted. Unlike substitutions, any base can be inserted
+    (including the same as the reference — e.g., A→A for homopolymer expansions).
+    """
+    result = {}
+    for base in BASES:
+        targets = list(BASES)
+        counts = [s['ins_matrix'][base][b] for b in targets]
+        total = sum(counts)
+        weights = [c / total if total > 0 else 0.25 for c in counts]
+        result[base] = {'targets': targets, 'weights': weights}
+    return result
+
+
 def _rate_with_ci(counts):
     """Compute rate + 95% CI for a counts dict with {subs, dels, ins, total}."""
     t = counts['total']
@@ -769,7 +805,7 @@ def _rate_with_ci_and_reliability(counts, max_rel_ci_width=0.30):
     return result
 
 
-def save_json(s, output_dir):
+def save_json(s, output_dir, misclustering=None, misclustering_rate=0.0):
     """Save all statistics as JSON."""
     total = s['total_bases']
 
@@ -800,6 +836,11 @@ def save_json(s, output_dir):
         },
         'burst_length_weights': _compute_burst_weights(s),
         'sub_weights': _compute_sub_weights(s),
+        'ins_weights': _compute_ins_weights(s),
+        'ins_matrix': {
+            f'{b1}->{b2}': s['ins_matrix'][b1][b2]
+            for b1 in BASES for b2 in BASES
+        },
         'gt_nucleotide_global': {
             b: sum(s['gt_pos_nt'][pos][b] for pos in s['gt_pos_nt'])
                / sum(sum(s['gt_pos_nt'][pos].values()) for pos in s['gt_pos_nt'])
@@ -824,10 +865,172 @@ def save_json(s, output_dir):
         },
     }
 
+    if misclustering is not None:
+        result['misclustering'] = misclustering
+    result['misclustering_rate'] = misclustering_rate
+
+    # Per-read error rate distribution (for sampling in data generation)
+    if s.get('gc_error_data'):
+        sub_rates = np.array([x[1] for x in s['gc_error_data']])
+        del_rates = np.array([x[2] for x in s['gc_error_data']])
+        ins_rates = np.array([x[3] for x in s['gc_error_data']])
+
+        # Gaussian fit (mean/std)
+        result['per_read_rate_distribution'] = {
+            'sub': {'mean': float(np.mean(sub_rates)), 'std': float(np.std(sub_rates))},
+            'del': {'mean': float(np.mean(del_rates)), 'std': float(np.std(del_rates))},
+            'ins': {'mean': float(np.mean(ins_rates)), 'std': float(np.std(ins_rates))},
+            'correlations': {
+                'sub_del': float(np.corrcoef(sub_rates, del_rates)[0, 1]),
+                'sub_ins': float(np.corrcoef(sub_rates, ins_rates)[0, 1]),
+                'del_ins': float(np.corrcoef(del_rates, ins_rates)[0, 1]),
+            },
+            'covariance_matrix': np.cov([sub_rates, del_rates, ins_rates]).tolist(),
+        }
+
+        # Beta distribution fit (bounded [0,1], good for rates)
+        beta_fits = {}
+        for name, rates in [('sub', sub_rates), ('del', del_rates), ('ins', ins_rates)]:
+            # Filter out exact zeros/ones for beta fitting
+            r = rates[(rates > 0) & (rates < 1)]
+            if len(r) > 10:
+                a, b, loc, scale = stats.beta.fit(r, floc=0, fscale=1)
+                beta_fits[name] = {'a': float(a), 'b': float(b)}
+            else:
+                beta_fits[name] = {'a': 1.0, 'b': 1.0}  # uniform fallback
+        result['per_read_beta_distribution'] = beta_fits
+
+        # Joint histogram of error counts (preserves correlations)
+        # Convert rates to integer counts using GT length
+        unique_diffs = np.diff(np.unique(sub_rates))
+        if len(unique_diffs) > 0 and np.min(unique_diffs) > 0:
+            gt_len = int(round(1.0 / np.min(unique_diffs)))  # infer GT length from discrete steps
+        else:
+            gt_len = total  # fallback: all reads have the same sub rate
+        if gt_len == 0:
+            gt_len = total  # fallback
+        sub_counts = np.round(sub_rates * gt_len).astype(int)
+        del_counts = np.round(del_rates * gt_len).astype(int)
+        ins_counts = np.round(ins_rates * gt_len).astype(int)
+
+        joint_hist = {}
+        for sc, dc, ic in zip(sub_counts, del_counts, ins_counts):
+            key = f"{sc},{dc},{ic}"
+            joint_hist[key] = joint_hist.get(key, 0) + 1
+        result['joint_error_histogram'] = joint_hist
+        result['joint_error_histogram_gt_len'] = gt_len
+
     path = os.path.join(output_dir, 'error_model.json')
     with open(path, 'w') as f:
         json.dump(result, f, indent=2)
     print(f"\nSaved JSON: {path}")
+
+
+# ============================================================
+# Misclustering estimation
+# ============================================================
+
+def estimate_misclustering_rate(s, output_dir):
+    """
+    Estimate misclustering rate using a 2-component Gaussian Mixture Model
+    on the normalized edit distance distribution.
+
+    Component 1 (low edit distance): correctly clustered reads.
+    Component 2 (high edit distance): misclustered reads from wrong molecule.
+
+    Returns dict with misclustering rate and component parameters.
+    """
+    ned = np.array(s['norm_edit_distances'])
+    if len(ned) == 0:
+        print("  No normalized edit distances available, skipping misclustering estimation.")
+        return None
+
+    X = ned.reshape(-1, 1)
+
+    # Fit 2-component GMM
+    gmm = GaussianMixture(n_components=2, random_state=42, max_iter=200)
+    gmm.fit(X)
+
+    means = gmm.means_.flatten()
+    stds = np.sqrt(gmm.covariances_.flatten())
+    weights = gmm.weights_.flatten()
+
+    # Component with lower mean = correctly clustered
+    if means[0] <= means[1]:
+        correct_idx, misclust_idx = 0, 1
+    else:
+        correct_idx, misclust_idx = 1, 0
+
+    # Check if components are well-separated (ratio of means > 3x)
+    # If not, the distribution is unimodal and there's no real misclustering
+    mean_ratio = means[misclust_idx] / means[correct_idx] if means[correct_idx] > 0 else 1.0
+    well_separated = mean_ratio > 3.0
+
+    if well_separated:
+        misclustering_rate = weights[misclust_idx]
+    else:
+        misclustering_rate = 0.0
+
+    result = {
+        'misclustering_rate': float(misclustering_rate),
+        'correct_component': {
+            'mean': float(means[correct_idx]),
+            'std': float(stds[correct_idx]),
+            'weight': float(weights[correct_idx]),
+        },
+        'misclustered_component': {
+            'mean': float(means[misclust_idx]),
+            'std': float(stds[misclust_idx]),
+            'weight': float(weights[misclust_idx]),
+        },
+        'n_reads': len(ned),
+    }
+
+    # Print report
+    print(f"\n--- Misclustering Estimation (GMM) ---")
+    print(f"  Total reads: {len(ned):,}")
+    print(f"  Correctly clustered: mean={means[correct_idx]:.4f}, std={stds[correct_idx]:.4f}, weight={weights[correct_idx]:.4f}")
+    print(f"  Misclustered:        mean={means[misclust_idx]:.4f}, std={stds[misclust_idx]:.4f}, weight={weights[misclust_idx]:.4f}")
+    if well_separated:
+        print(f"  Components well-separated (ratio={mean_ratio:.1f}x). Misclustering rate: {misclustering_rate:.4%}")
+    else:
+        print(f"  Components NOT well-separated (ratio={mean_ratio:.1f}x). No misclustering detected (rate set to 0).")
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(6, 3.5))
+
+    # Histogram
+    bins = np.linspace(0, min(1.0, ned.max() * 1.1), 100)
+    ax.hist(ned, bins=bins, density=True, alpha=0.5, color='gray', label='Observed')
+
+    # Fitted components
+    x_plot = np.linspace(0, bins[-1], 500)
+    for idx, (label, color) in zip(
+        [correct_idx, misclust_idx],
+        [('Correctly clustered', '#6699CC'), ('Misclustered', '#EE6677')]
+    ):
+        pdf = weights[idx] * stats.norm.pdf(x_plot, means[idx], stds[idx])
+        ax.plot(x_plot, pdf, color=color, linewidth=2, label=f'{label} ($\\mu$={means[idx]:.3f}, $\\pi$={weights[idx]:.3f})')
+
+    # Combined PDF
+    pdf_total = sum(
+        weights[i] * stats.norm.pdf(x_plot, means[i], stds[i]) for i in range(2)
+    )
+    ax.plot(x_plot, pdf_total, 'k--', linewidth=1, alpha=0.7, label='GMM fit')
+
+    ax.set_xlabel('Normalized edit distance')
+    ax.set_ylabel('Density')
+    ax.set_title(f'Misclustering estimation: rate = {misclustering_rate:.2%}')
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plot_path = os.path.join(output_dir, 'misclustering_estimation.pdf')
+    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved plot: {plot_path}")
+
+    return result
 
 
 # ============================================================
@@ -1077,6 +1280,53 @@ def make_plots(s, output_dir):
         plt.savefig(os.path.join(output_dir, 'gt_nucleotide_by_position.pdf'), dpi=150)
         plt.close()
 
+    # 10. Per-read error rate distributions and correlations
+    if s['gc_error_data']:
+        sub_rates = np.array([x[1] for x in s['gc_error_data']])
+        del_rates = np.array([x[2] for x in s['gc_error_data']])
+        ins_rates = np.array([x[3] for x in s['gc_error_data']])
+
+        # --- Histograms of per-read sub/del/ins rates ---
+        fig, axes = plt.subplots(1, 3, figsize=(12, 3.5))
+        for ax, rates, name, color in zip(axes,
+                [sub_rates, del_rates, ins_rates],
+                ['Substitution', 'Deletion', 'Insertion'],
+                ['#e74c3c', '#3498db', '#2ecc71']):
+            # Use bins aligned to discrete values (errors are integer counts / gt_len)
+            unique_vals = np.unique(rates)
+            if len(unique_vals) > 1:
+                step = np.min(np.diff(unique_vals))
+                bins = np.arange(rates.min() - step/2, rates.max() + step, step)
+            else:
+                bins = 50
+            ax.hist(rates, bins=bins, density=True, alpha=0.5, color=color, label='Observed')
+            # Fit Beta distribution (bounded [0,1], handles skewed data)
+            positive_rates = rates[rates > 0]
+            if len(positive_rates) > 10:
+                a_fit, b_fit, _, _ = stats.beta.fit(positive_rates, floc=0, fscale=1)
+                x_plot = np.linspace(0, rates.max() * 1.1, 200)
+                ax.plot(x_plot, stats.beta.pdf(x_plot, a_fit, b_fit), color=color, linewidth=2,
+                        label=f'Beta (a={a_fit:.2f}, b={b_fit:.2f})')
+            else:
+                x_plot = np.linspace(0, max(rates.max(), 0.01) * 1.1, 200)
+            ax.set_xlabel(f'{name} rate (per read)')
+            ax.set_ylabel('Density')
+            ax.set_title(name)
+            ax.legend(fontsize=7)
+            ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'per_read_error_distributions.pdf'), dpi=150)
+        plt.close()
+
+        # Print summary
+        print(f"\n  Per-read error rate distributions:")
+        for name, rates in [('Sub', sub_rates), ('Del', del_rates), ('Ins', ins_rates)]:
+            print(f"    {name}: mean={np.mean(rates):.4f}, std={np.std(rates):.4f}")
+        corr_sd = np.corrcoef(sub_rates, del_rates)[0, 1]
+        corr_si = np.corrcoef(sub_rates, ins_rates)[0, 1]
+        corr_di = np.corrcoef(del_rates, ins_rates)[0, 1]
+        print(f"    Correlations: sub-del={corr_sd:.3f}, sub-ins={corr_si:.3f}, del-ins={corr_di:.3f}")
+
     print(f"Saved plots to {output_dir}/")
 
 
@@ -1111,12 +1361,50 @@ def main():
     total_reads = sum(len(reads) for _, reads in examples)
     print(f"Total reads to process: {total_reads:,}")
 
-    # Collect statistics
-    print("Aligning reads and collecting statistics...")
+    # Pass 1: collect statistics on all reads to estimate misclustering
+    print("Pass 1: Aligning reads and collecting statistics (all reads)...")
     s = collect_statistics(examples)
 
-    # Report
-    print_report(s, args.output_dir)
+    # Estimate misclustering rate from the full dataset
+    misc_result = estimate_misclustering_rate(s, args.output_dir)
+
+    misclustering_rate = 0.0
+    if misc_result and misc_result['misclustering_rate'] > 0:
+        misclustering_rate = misc_result['misclustering_rate']
+
+        # Pass 2: re-collect statistics excluding misclustered reads
+        # Use GMM threshold: read is misclustered if its normalized edit distance
+        # is closer to the misclustered component than the correct one
+        threshold = (misc_result['correct_component']['mean'] + misc_result['misclustered_component']['mean']) / 2
+        print(f"\nPass 2: Re-estimating error model excluding misclustered reads (threshold={threshold:.4f})...")
+
+        filtered_examples = []
+        total_kept, total_removed = 0, 0
+        for gt, reads in examples:
+            gt_len = len(gt)
+            clean_reads = []
+            for read in reads:
+                ops = align_read_to_gt(read, gt)
+                n_errors = sum(1 for op, _, _ in ops if op != '=')
+                ned = n_errors / gt_len if gt_len > 0 else 0
+                if ned < threshold:
+                    clean_reads.append(read)
+                    total_kept += 1
+                else:
+                    total_removed += 1
+            if len(clean_reads) >= 1:
+                filtered_examples.append((gt, clean_reads))
+
+        print(f"  Kept {total_kept:,} reads, removed {total_removed:,} ({total_removed/(total_kept+total_removed):.1%})")
+        print(f"  Clusters: {len(filtered_examples):,} (from {len(examples):,})")
+
+        s = collect_statistics(filtered_examples)
+        print("  Re-estimated error model from clean reads only.")
+    else:
+        print("\nNo misclustering detected. Using all reads for error model.")
+
+    # Report and save
+    print_report(s, args.output_dir, _misclustering=misc_result, _misclustering_rate=misclustering_rate)
     make_plots(s, args.output_dir)
 
 

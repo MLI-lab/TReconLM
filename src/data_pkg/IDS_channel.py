@@ -322,114 +322,240 @@ def IDS_channel(x, channel_statistics, rng):
     return y
 
 
-def realistic_IDS_channel(x, error_model, gc_bin, homopolymer_map, rng=None):
-    """
-    Simulates one corrupted version of a DNA sequence using a realistic error model
-    estimated from real-world data.
+def _sample_burst_length(burst_weight_entry, rng):
+    """Sample a burst length from the learned distribution.
 
-    Unlike IDS_channel which uses fixed error probabilities for all positions,
-    this function uses context-dependent rates based on:
-    - The nucleotide at each position (A/C/G/T)
-    - Homopolymer run length (1, 2, 3, 4, 5+)
-    - GC content of the sequence (low/mid/high)
-    - Position zone (start/middle/end)
-
-    Error rates are looked up from joint statistics when sufficient data exists
-    (>= 1000 observations), otherwise computed multiplicatively from marginal rates.
-
-    Parameters:
-        x (str): The ground truth input DNA sequence.
-        error_model (dict): Preprocessed error model from load_error_model().
-        gc_bin (str): GC content bin for this sequence ('low', 'mid', or 'high').
-        homopolymer_map (list): Precomputed homopolymer run length at each position.
-        rng: Random number generator (random.Random instance or None).
+    Args:
+        burst_weight_entry: dict with 'lengths' (list[int]) and 'weights' (list[float]).
+        rng: random number generator.
 
     Returns:
-        str: The corrupted output sequence.
+        int: sampled burst length (>= 1).
+    """
+    lengths = burst_weight_entry['lengths']
+    weights = burst_weight_entry['weights']
+    r = rng.random()
+    cumsum = 0.0
+    for l, w in zip(lengths, weights):
+        cumsum += w
+        if cumsum >= r:
+            return l
+    return lengths[-1]
+
+
+def _partition_into_bursts(n_errors, burst_weights, rng):
+    """Partition a total error count into burst events using the learned distribution.
+
+    Samples burst lengths until the total equals or exceeds n_errors, then trims
+    the last burst so the sum is exactly n_errors.
+
+    Args:
+        n_errors (int): total number of individual errors to distribute.
+        burst_weights: dict with 'lengths' and 'weights' from error_model.
+        rng: random number generator.
+
+    Returns:
+        list[int]: burst lengths summing to n_errors.
+    """
+    if n_errors <= 0:
+        return []
+    bursts = []
+    remaining = n_errors
+    while remaining > 0:
+        bl = _sample_burst_length(burst_weights, rng)
+        bl = min(bl, remaining)
+        bursts.append(bl)
+        remaining -= bl
+    return bursts
+
+
+def error_model_IDS_channel(x, n_sub, n_del, n_ins, error_model, homopolymer_map, rng=None):
+    """
+    Corrupts a DNA sequence with approximately n_sub substitutions, n_del deletions,
+    and n_ins insertions, distributed across positions proportional to
+    context-dependent weights (nucleotide, homopolymer, position zone).
+
+    Errors are placed as bursts (consecutive runs) sampled from the learned burst
+    length distribution. This matches real-world nanopore error patterns where
+    ~15-20% of errors occur in consecutive runs of 2+.
+
+    Parameters:
+        x (str): Ground truth sequence.
+        n_sub (int): Number of substitutions to apply.
+        n_del (int): Number of deletions to apply.
+        n_ins (int): Number of insertions to apply.
+        error_model (dict): Preprocessed error model.
+        homopolymer_map (list): Homopolymer run length at each position.
+        rng: Random number generator.
+
+    Returns:
+        str: The corrupted sequence.
     """
     rng = rng or random
     alphabet = ['A', 'C', 'G', 'T']
     length = len(x)
-    y = []
-    t = 0
-
-    joint_rates = error_model['joint_rates']
+    sub_weights_dict = error_model.get('sub_weights', {})
+    ins_weights_dict = error_model.get('ins_weights', {})
     per_nt = error_model['per_nucleotide']
     multipliers = error_model['multipliers']
-    sub_weights = error_model['sub_weights']          # {base: {targets: [...], weights: [...]}}
-    burst_weights = error_model['burst_length_weights']  # {type: {lengths: [...], weights: [...]}}
+    burst_length_weights = error_model.get('burst_length_weights', {})
 
-    while t < length:
+    # Step 1: compute per-position context weights for each error type
+    w_sub = []
+    w_del = []
+    w_ins = []
+
+    for t in range(length):
         base = x[t]
         hp_len = homopolymer_map[t] if t < len(homopolymer_map) else 1
         zone = 'start' if t < 10 else ('end' if t >= length - 10 else 'middle')
 
-        # Look up error rates
-        jkey = f"{base}|hp={hp_len}|gc={gc_bin}|{zone}"
+        # Base rates
+        base_sub = per_nt.get(base, {}).get('sub_rate', 0.01)
+        base_del = per_nt.get(base, {}).get('del_rate', 0.01)
+        base_ins = per_nt.get(base, {}).get('ins_rate', 0.01)
 
-        if jkey in joint_rates and joint_rates[jkey]['total'] >= 1000:
-            # Use joint rate: sample from CI
-            jr = joint_rates[jkey]
-            p_sub = rng.uniform(jr['sub_rate_ci'][0], jr['sub_rate_ci'][1])
-            p_del = rng.uniform(jr['del_rate_ci'][0], jr['del_rate_ci'][1])
-            p_ins = rng.uniform(jr['ins_rate_ci'][0], jr['ins_rate_ci'][1])
-        else:
-            # Fallback: multiplicative model
-            base_sub = per_nt[base]['sub_rate']
-            base_del = per_nt[base]['del_rate']
-            base_ins = per_nt[base]['ins_rate']
+        # Context multipliers
+        hp_key = str(hp_len)
+        hp_m = multipliers['homopolymer'].get(hp_key, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
+        z_m = multipliers['position_zone'].get(zone, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
 
-            hp_key = str(hp_len)
-            hp_m = multipliers['homopolymer'].get(hp_key, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
-            z_m = multipliers['position_zone'].get(zone, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
-            gc_m_key = '<0.30' if gc_bin == 'low' else ('>0.70' if gc_bin == 'high' else '0.30-0.70')
-            gc_m = multipliers['gc_content'].get(gc_m_key, {'sub': 1.0, 'del': 1.0, 'ins': 1.0})
+        w_sub.append(base_sub * hp_m['sub'] * z_m['sub'])
+        w_del.append(base_del * hp_m['del'] * z_m['del'])
+        w_ins.append(base_ins * hp_m['ins'] * z_m['ins'])
 
-            p_sub = base_sub * hp_m['sub'] * z_m['sub'] * gc_m['sub']
-            p_del = base_del * hp_m['del'] * z_m['del'] * gc_m['del']
-            p_ins = base_ins * hp_m['ins'] * z_m['ins'] * gc_m['ins']
+    # Normalize weights to probabilities
+    def normalize(weights):
+        total = sum(weights)
+        if total == 0:
+            return [1.0 / len(weights)] * len(weights)
+        return [w / total for w in weights]
 
-        # Clamp total probability to < 1
-        p_total = p_sub + p_del + p_ins
-        if p_total >= 1.0:
-            scale = 0.95 / p_total
-            p_sub *= scale
-            p_del *= scale
-            p_ins *= scale
+    def weighted_pick_one(available, weights_all, rng):
+        """Pick one position from available indices, weighted by weights_all."""
+        w = [weights_all[i] for i in available]
+        total = sum(w)
+        if total == 0:
+            return available[rng.randint(0, len(available) - 1)]
+        r = rng.random() * total
+        cumsum = 0.0
+        for i in range(len(available)):
+            cumsum += w[i]
+            if cumsum >= r:
+                return available[i]
+        return available[-1]
 
-        # Roll dice
-        rd = rng.uniform(0.0, 1.0)
+    def place_bursts(bursts, weights, occupied, length, rng):
+        """Place burst events at weighted positions, extending consecutively.
 
-        if rd < p_del:
-            # Deletion: sample burst length
-            bw = burst_weights.get('deletion', {'lengths': [1], 'weights': [1.0]})
-            burst = weighted_choice(bw['lengths'], bw['weights'], rng)
-            t += min(burst, length - t)  # don't skip past end
+        For each burst of length B, pick a start position from the available
+        (non-occupied) positions weighted by `weights`, then mark the next B
+        consecutive non-occupied positions starting from there.
 
-        elif rd < p_del + p_ins:
-            # Insertion: sample burst length, insert random bases
-            bw = burst_weights.get('insertion', {'lengths': [1], 'weights': [1.0]})
-            burst = weighted_choice(bw['lengths'], bw['weights'], rng)
-            for _ in range(burst):
-                y.append(rng.choice(alphabet))
-            # Don't advance t — current base still needs processing
+        Args:
+            bursts: list of burst lengths to place.
+            weights: per-position weights for choosing start positions.
+            occupied: set of already-occupied positions (modified in place).
+            length: sequence length.
+            rng: random number generator.
 
-        elif rd < p_del + p_ins + p_sub:
-            # Substitution: sample target base from real distribution
-            if base in sub_weights:
-                sw = sub_weights[base]
-                y.append(weighted_choice(sw['targets'], sw['weights'], rng))
+        Returns:
+            set of all positions assigned to these bursts.
+        """
+        positions = set()
+        for burst_len in bursts:
+            available = [i for i in range(length) if i not in occupied]
+            if not available:
+                break
+            start = weighted_pick_one(available, weights, rng)
+            # Extend burst consecutively from start position
+            placed = 0
+            pos = start
+            while placed < burst_len and pos < length:
+                if pos not in occupied:
+                    positions.add(pos)
+                    occupied.add(pos)
+                    placed += 1
+                pos += 1
+            # If we hit the end, wrap backwards from start
+            pos = start - 1
+            while placed < burst_len and pos >= 0:
+                if pos not in occupied:
+                    positions.add(pos)
+                    occupied.add(pos)
+                    placed += 1
+                pos -= 1
+        return positions
+
+    # Step 2: partition error counts into bursts
+    n_sub = min(n_sub, length)
+    n_del = min(n_del, length)
+    n_ins = min(n_ins, length)
+
+    sub_burst_weights = burst_length_weights.get('substitution', {'lengths': [1], 'weights': [1.0]})
+    del_burst_weights = burst_length_weights.get('deletion', {'lengths': [1], 'weights': [1.0]})
+    ins_burst_weights = burst_length_weights.get('insertion', {'lengths': [1], 'weights': [1.0]})
+
+    sub_bursts = _partition_into_bursts(n_sub, sub_burst_weights, rng)
+    del_bursts = _partition_into_bursts(n_del, del_burst_weights, rng)
+    ins_bursts = _partition_into_bursts(n_ins, ins_burst_weights, rng)
+
+    # Step 3: place bursts at weighted positions
+    occupied = set()
+    sub_positions = place_bursts(sub_bursts, w_sub, occupied, length, rng)
+    del_positions = place_bursts(del_bursts, w_del, occupied, length, rng)
+
+    # For insertions: place burst start positions, then insert multiple bases there
+    ins_at_pos = {}
+    ins_available = list(range(length))
+    for burst_len in ins_bursts:
+        if not ins_available:
+            break
+        start = weighted_pick_one(ins_available, w_ins, rng)
+        # Consecutive insertion burst: insert bases at consecutive positions
+        placed = 0
+        pos = start
+        while placed < burst_len and pos < length:
+            ins_at_pos[pos] = ins_at_pos.get(pos, 0) + 1
+            placed += 1
+            pos += 1
+        # Wrap backwards if needed
+        pos = start - 1
+        while placed < burst_len and pos >= 0:
+            ins_at_pos[pos] = ins_at_pos.get(pos, 0) + 1
+            placed += 1
+            pos -= 1
+
+    # Step 4: build the read
+    read = []
+    for t in range(length):
+        if t in del_positions:
+            # Deletion: skip this base
+            pass
+        elif t in sub_positions:
+            # Substitution: replace with a different base
+            base = x[t]
+            if base in sub_weights_dict:
+                sw = sub_weights_dict[base]
+                read.append(weighted_choice(sw['targets'], sw['weights'], rng))
             else:
                 sub_list = [b for b in alphabet if b != base]
-                y.append(rng.choice(sub_list))
-            t += 1
-
+                read.append(rng.choice(sub_list))
         else:
-            # No error
-            y.append(x[t])
-            t += 1
+            # No error: keep original base
+            read.append(x[t])
 
-    return ''.join(y)
+        # Apply insertions after this position (biased by learned insertion frequencies)
+        if t in ins_at_pos:
+            ref_base = x[t]
+            for _ in range(ins_at_pos[t]):
+                if ref_base in ins_weights_dict:
+                    iw = ins_weights_dict[ref_base]
+                    read.append(weighted_choice(iw['targets'], iw['weights'], rng))
+                else:
+                    read.append(rng.choice(alphabet))
+
+    return ''.join(read)
 
 
 if __name__ == '__main__':
