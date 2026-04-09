@@ -740,6 +740,11 @@ def train(cfg: DictConfig) -> None:
             with open(run_id_path, 'w') as f:
                 f.write(run_id)
 
+    # log initial point on resume so wandb doesn't interpolate a gap
+    if wandb_log and master_process and init_from == 'resume':
+        lr = get_lr(iter_num) if decay_lr else learning_rate
+        wandb.log({"iter": iter_num, "lr": lr})
+
     # training loop
     X, Y, lengths = get_batch() # fetch the very first batch
     t0 = time.time()
