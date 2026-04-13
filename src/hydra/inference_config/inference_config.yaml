@@ -19,7 +19,7 @@ general:
 wandb:
   wandb_log: true
   wandb_project: ${project}
-  wandb_entity: franziweindel-technical-university-of-munich
+  wandb_entity: <your.wandb.entity>
 
 # Logit margin profiling configuration
 # When enabled, computes the gap between top-1 and top-2 logits during generation

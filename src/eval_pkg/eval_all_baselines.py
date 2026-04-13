@@ -1,3 +1,24 @@
+"""Evaluate baseline trace-reconstruction algorithms (BMALA, Iterative, MUSCLE, TrellisBMA, VS).
+
+Usage:
+    # Standard evaluation using a local dataset:
+    python -m src.eval_pkg.eval_all_baselines --alg muscle --local-data-dir ./data/my_dataset --workers 8
+
+    # Evaluate with a specific error profile:
+    python -m src.eval_pkg.eval_all_baselines --alg trellisbma --local-data-dir ./data --error-profile noisy
+
+    # Sweep over k values:
+    python -m src.eval_pkg.eval_all_baselines --alg trellisbma --sweep --max-k 5
+
+    # Misclustering robustness experiment:
+    python -m src.eval_pkg.eval_all_baselines --alg muscle --local-data-dir ./data --misclustering --contamination-rates 0.1,0.15,0.2
+
+    # Throughput timing measurement:
+    python -m src.eval_pkg.eval_all_baselines --alg vs --local-data-dir ./data --timing --timing-duration 300
+
+Results are logged to Weights & Biases (configure ENTITY at the top of this file).
+"""
+
 import os
 import sys
 import time

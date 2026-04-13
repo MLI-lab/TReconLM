@@ -3,7 +3,7 @@
 # Quick test for inference using tutorial/example_data (10 examples)
 #
 # SETUP: First download the model from HuggingFace:
-#   python -c "from huggingface_hub import hf_hub_download; hf_hub_download('mli-lab/TReconLM', 'model_seq_len_110.pt', local_dir='models')"
+#   python -c "from huggingface_hub import hf_hub_download; hf_hub_download('tracereconstruction2026/TReconLM', 'model_seq_len_110.pt', local_dir='models')"
 #
 # Usage: python src/inference.py exps=test/inference_example
 

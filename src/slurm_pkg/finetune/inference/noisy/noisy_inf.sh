@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -p lrz-hgx-h100-94x4
+#SBATCH -p <your.slurm.partition>
 #SBATCH --nodes=1
 #SBATCH --mem=50GB
 #SBATCH --ntasks-per-node=1

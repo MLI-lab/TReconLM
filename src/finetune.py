@@ -25,7 +25,7 @@ import wandb
 from omegaconf import DictConfig, OmegaConf
 
 
-from src.data_pkg.prepare import encode_list, pad_encoded_data
+from src.data_pkg.tokenizer import encode_list, pad_encoded_data
 from src.utils.data_functions import load_data_from_file
 from src.utils.wandb_utils import wandb_kwargs_via_cfg
 from src.utils.hamming_distance import hamming_distance_postprocessed

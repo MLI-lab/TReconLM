@@ -1,15 +1,10 @@
-import numpy as np
-import torch
-import subprocess
-import os
-import sys
-import time
-from typing import List, Dict, Any
+"""Inference wrappers for GPT-based consensus prediction and alignment."""
 
+import time
+import torch
+from typing import Dict, Any
 
 from src.data_pkg.data_generation import unnest_strings
-from src.utils.helper_functions import filter_string
-from src.utils.print_functions import print_list
 from src.gpt_pkg.beam_search import beam_search, beam_search_cached
 from src.eval_pkg.majority_vote import majority_merge, extended_majority_vote
 

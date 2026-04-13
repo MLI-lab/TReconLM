@@ -16,7 +16,6 @@
     },
     "mounts": [
       "type=bind,source=${localEnv:HOME},target=/home/${localEnv:USER}",
-      "type=bind,source=/mnt/hdd_pool_zion/users/franziska/,target=/mnt/"
     ],
     "runArgs": [
       "--runtime=nvidia",

@@ -21,7 +21,7 @@ from omegaconf import DictConfig, OmegaConf # to create, merge, and manipulate c
 
 
 from src.data_pkg.data_generation import data_generation, data_generation_with_error_model, load_error_model, validate_block_size_for_variable_length
-from src.data_pkg.prepare import encode_list, pad_encoded_data
+from src.data_pkg.tokenizer import encode_list, pad_encoded_data
 from src.utils.helper_functions import extract_elements
 from src.utils.wandb_utils import wandb_kwargs_via_cfg
 

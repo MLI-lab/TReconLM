@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -p lrz-cpu
+#SBATCH -p <your.slurm.partition>
 #SBATCH --qos=cpu
 #SBATCH --nodes=1
 #SBATCH --mem=400GB

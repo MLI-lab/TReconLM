@@ -20,7 +20,7 @@ data:
 
 model:
   #checkpoint_path: <your.storage.path>/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt60_compute_final_60nt_reproduce_seed1/final_60nt_reproduce_seed1/train_run_gpt_20250805_002145/checkpoint_best.pt
-  checkpoint_path: "/workspaces/TReconLM/tutorial/models/models--mli-lab--TReconLM/snapshots/950d152df4daab579e7ef6e65cfb6566b9c392a9/model_seq_len_60.pt"
+  checkpoint_path: "/workspaces/TReconLM/tutorial/models/models--tracereconstruction2026--TReconLM/snapshots/950d152df4daab579e7ef6e65cfb6566b9c392a9/model_seq_len_60.pt"
   sampling:
     temperature: 1.0
     top_k: None

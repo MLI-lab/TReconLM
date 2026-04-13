@@ -22,11 +22,6 @@ def majority_vote(list, length, check_length):
     string: the result string.
     """
 
-    # TODO: Do we need this here? 
-    check_variable = False
-    if check_variable and len(list) != check_length:
-        print('Error: something went wrong - majority_vote')
-        return -1
 
     # Trim the strings to the fixed length
     strs = [s[:length] for s in list]
@@ -67,11 +62,6 @@ def simple_majority_vote(list, length, check_length):
     string: the result string.
     """
 
-    # TODO: Do we need this here? 
-    check_variable = False
-    if check_variable and len(list) != check_length:
-        print('Error: something went wrong - majority_vote')
-        return -1
 
     # Trim the strings to the fixed length
     strs = [s[:length] for s in list]

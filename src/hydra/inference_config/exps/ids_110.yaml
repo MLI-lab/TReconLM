@@ -20,7 +20,7 @@ data:
 
 
 model:
-  checkpoint_path: /mnt/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt110_compute_final_110nt_reproduce/final_110nt_reproduce/train_run_gpt_20250806_100623/checkpoint_best.pt
+  checkpoint_path: /mnt/model_checkpoints/Reproduce/ids_data_nuc_CPRED_obs10_gt110_compute_final_110nt_reproduce_seed42/final_110nt_reproduce_seed42/train_run_gpt_20250829_105702/checkpoint_best.pt
   sampling:
     temperature: 1.0
     top_k: None
@@ -35,7 +35,7 @@ model:
     track_all_layers: false      # If true, save attention from ALL layers (high memory usage); if false, only save last layer
     save_per_head_attention: false  # If true, save per-head attention [tokens, heads, seq]; if false, save averaged [tokens, seq] (smaller files)
     attention_output_dir: "<your.data.path>/TReconLM/attention_results/synthetic_L110/all_layers" # Relative - creates under current working directory
-    max_samples: 500 # randomly samples max_samples examples from the full artifact using a fixed seed
+    max_samples: null # randomly samples max_samples examples from the full artifact using a fixed seed
     permute_traces: false  # If true, randomly permute the order of traces/reads before inference to test for positional bias
     # Majority voting ensemble parameters
     majority_voting:

@@ -1,7 +1,6 @@
 import os
 
-# On zion and yosemite, disable NCCL P2P due to broken GPU-to-GPU communication
-# This fixes hanging barriers and broadcasts in distributed mode
+# Disable NCCL P2P to fix hanging barriers and broadcasts in distributed mode on some machines
 os.environ["NCCL_P2P_DISABLE"] = "1"
 
 import torch
@@ -3683,10 +3682,13 @@ def _main_impl(cfg: DictConfig):
                     l_arr = np.array(l_per_N_cropped[N])
                     sr = success_cropped[N] / count[N]
                     fr = 1 - sr
+                    l_fail = l_arr[l_arr > 0]
+                    fail_str = (f", LEV(failures)={l_fail.mean():.4f}±{l_fail.std():.4f} n={l_fail.size}"
+                                if l_fail.size else "")
                     line = (f"  N={N:>2}: count={count[N]:>5}, "
                             f"success={sr:.2%}, failure={fr:.2%}, "
                             f"HAM={h_arr.mean():.3f}±{h_arr.std():.3f}, "
-                            f"LEV={l_arr.mean():.4f}±{l_arr.std():.4f}")
+                            f"LEV={l_arr.mean():.4f}±{l_arr.std():.4f}{fail_str}")
                     if cross_mode:
                         h_arr_f = np.array(h_per_N_full[N])
                         l_arr_f = np.array(l_per_N_full[N])

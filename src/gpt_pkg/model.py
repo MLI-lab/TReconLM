@@ -473,41 +473,48 @@ class GPT(nn.Module):
         return flops_achieved
 
     @torch.no_grad()
-    def generate(self, idx: torch.LongTensor, attn_mask: torch.BoolTensor, max_new_tokens: int, temperature: float = 1.0, top_k: int | None = None, itos=None) -> torch.LongTensor:
+    def generate(self, idx: torch.LongTensor, attn_mask: torch.BoolTensor, max_new_tokens: int, temperature: float = 1.0, top_k: int | None = None, itos=None, use_kv_cache: bool = True) -> torch.LongTensor:
         """
-        Greedy (or top-k) token generation using per-layer KV cache.
-        Only the new token is fed through each transformer block.
+        Greedy (or top-k) token generation, optionally using per-layer KV cache.
         """
         device = idx.device
-        # initialize empty cache for each transformer layer
-        caches: list[tuple[torch.Tensor, torch.Tensor] | None] = [None] * len(self.transformer.h)
+        caches: list[tuple[torch.Tensor, torch.Tensor] | None] = [None] * len(self.transformer.h) if use_kv_cache else None
 
         for _ in range(max_new_tokens):
-            # crop to block_size if needed
-            if idx.size(1) > self.config.block_size:
-                idx       = idx[:, -self.config.block_size :]
-                attn_mask = attn_mask[:, -self.config.block_size :]
-                for i in range(len(caches)):
-                    caches[i] = _crop_kv_cache(caches[i], self.config.block_size)
+            if use_kv_cache:
+                # crop to block_size if needed
+                if idx.size(1) > self.config.block_size:
+                    idx       = idx[:, -self.config.block_size :]
+                    attn_mask = attn_mask[:, -self.config.block_size :]
+                    for i in range(len(caches)):
+                        caches[i] = _crop_kv_cache(caches[i], self.config.block_size)
 
-            # isolate last token and its mask
-            last_token = idx[:, -1:].to(device)       # (B,1)
+                # isolate last token and its mask
+                last_token = idx[:, -1:].to(device)       # (B,1)
 
-            # compute positional index for that token
-            pos = (attn_mask.long().cumsum(-1) - 1).clamp(min=0)
-            last_pos = pos[:, -1:]          # (B,1,1)
+                # compute positional index for that token
+                pos = (attn_mask.long().cumsum(-1) - 1).clamp(min=0)
+                last_pos = pos[:, -1:]          # (B,1,1)
 
-            # embed and dropout
-            x = self.transformer.wte(last_token) + self.transformer.wpe(last_pos)
-            x = self.transformer.drop(x)
+                # embed and dropout
+                x = self.transformer.wte(last_token) + self.transformer.wpe(last_pos)
+                x = self.transformer.drop(x)
 
-            # pass through each block with its cache
-            for i, block in enumerate(self.transformer.h):
-                x, caches[i] = block(x, attn_mask=attn_mask, cache=caches[i]) # not sure if correctly update 
-            # final layer norm
-            x = self.transformer.ln_f(x)  # (B,1,C)
+                # pass through each block with its cache
+                for i, block in enumerate(self.transformer.h):
+                    x, caches[i] = block(x, attn_mask=attn_mask, cache=caches[i])
+                # final layer norm
+                x = self.transformer.ln_f(x)  # (B,1,C)
+            else:
+                # no KV cache: full forward pass each step
+                idx_cond = idx[:, -self.config.block_size:]
+                am_cond = attn_mask[:, -self.config.block_size:]
+                logits_full, _ = self(idx_cond, attn_mask=am_cond)
+                # logits_full is (B, 1, V) in inference mode (last position only)
+                logits = logits_full[:, 0, :] / temperature
 
-            logits = self.lm_head(x)[:, 0, :] / temperature  # (B, V)
+            if use_kv_cache:
+                logits = self.lm_head(x)[:, 0, :] / temperature  # (B, V)
 
             # optional top-k pruning
             if top_k is not None:

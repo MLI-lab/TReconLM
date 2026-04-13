@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -p lrz-dgx-a100-40x8-mig
+#SBATCH -p <your.slurm.partition>
 #SBATCH --qos=mig
 #SBATCH --nodes=1
 #SBATCH --mem=60GB

@@ -1,7 +1,6 @@
 # TReconLM
 
 TReconLM is a decoder-only transformer model for trace reconstruction of noisy DNA sequences. It is trained to reconstruct a ground-truth sequence from multiple noisy copies (traces), each independently corrupted by insertions, deletions, and substitutions.  
-(For more details, see [our paper](https://arxiv.org/abs/2507.12927).)
 
 ---
 
@@ -38,8 +37,8 @@ Alternatively, skip the above steps and open the project in a Dev Container usin
 
 Pretrained and fine-tuned models, as well as synthetic test datasets, are available on Hugging Face:
 
-- [Models](https://huggingface.co/mli-lab/TReconLM)
-- [Test datasets](https://huggingface.co/datasets/mli-lab/TReconLM_datasets)
+- [Models](https://huggingface.co/tracereconstruction2026/TReconLM)
+- [Test datasets](https://huggingface.co/datasets/tracereconstruction2026/TReconLM_datasets)
 
 ### Getting Started
 
@@ -58,7 +57,7 @@ Quick test (runs inference on `tutorial/example_data` with a pretrained model):
 ```bash
 # Download a model from HuggingFace
 mkdir -p models
-python -c "from huggingface_hub import hf_hub_download; hf_hub_download('mli-lab/TReconLM', 'model_seq_len_110.pt', local_dir='models')"
+python -c "from huggingface_hub import hf_hub_download; hf_hub_download('tracereconstruction2026/TReconLM', 'model_seq_len_110.pt', local_dir='models')"
 
 # Run inference
 python src/inference.py exps=test/inference_example
@@ -176,6 +175,16 @@ To pretrain, fine-tune, or run inference with our deep learning baselines, see:
 - `DeepLearningBaselines/RobuSeqNet/slurm_pkg`
 
 These contain example SLURM execution scripts.
+
+---
+
+## Tests
+
+Run the test suite with [nox](https://nox.thirdparty.dev):
+
+```bash
+nox
+```
 
 ---
 

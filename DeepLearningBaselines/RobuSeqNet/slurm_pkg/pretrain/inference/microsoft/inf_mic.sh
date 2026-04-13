@@ -12,7 +12,7 @@
 
 srun \
   --container-image=<your.storage.path>/enroot/Treconlm.sqsh \
-  --container-mounts="$PWD/TReconLM:/TReconLM,/dss/dssmcmlfs01/pn57vo:/dss/dssmcmlfs01/pn57vo" \
+  --container-mounts="$PWD/TReconLM:/TReconLM,<your.storage.path>:<your.storage.path>" \
   --container-env WANDB_API_KEY=<your.wandb.api.key> \
   bash -c "
     cd /TReconLM/DeepLearningBaselines/RobuSeqNet/examples

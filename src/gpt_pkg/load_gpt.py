@@ -84,7 +84,7 @@ def load_transformer_model(model_name, device, dataset, checkpoint_dir, data_pkg
         decode = lambda l: ''.join([itos[i] for i in l])
 
     else:
-        print("ERROR - No meta.pkl found.")
+        print("ERROR, No meta.pkl found.")
         sys.exit()
         
     return model, encode, decode, vocab_size, ctx # Return model, encode function (text to tokens) decode function (tokens to text), vocab size and torch.autocast context for mixed-precision inference which automatically selects the appropriate precision (e.g., float16, bfloat16, or float32) for different operations to improve performance and memory efficiency.

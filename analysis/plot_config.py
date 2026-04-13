@@ -19,7 +19,19 @@ from collections import defaultdict
 # W&B Configuration
 # 
 
-WANDB_ENTITY = "<your.wandb.entity>"
+def _get_wandb_entity():
+    """Get wandb entity from env var or logged-in user."""
+    entity = os.environ.get("WANDB_ENTITY")
+    if entity:
+        return entity
+    try:
+        import wandb
+        api = wandb.Api()
+        return api.default_entity
+    except Exception:
+        raise RuntimeError("Set WANDB_ENTITY env var or log in with `wandb login`")
+
+WANDB_ENTITY = _get_wandb_entity()
 
 # Project names
 WANDB_PROJECTS = {

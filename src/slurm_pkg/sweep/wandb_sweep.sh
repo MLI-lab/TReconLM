@@ -5,10 +5,17 @@
 #SBATCH --mem=30GB
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=10
-#SBATCH --gres=gpu:4                  
+#SBATCH --gres=gpu:4
 #SBATCH --time=48:00:00
 #SBATCH -o <your.slurm.home.path>/TReconLM/src/slurm_pkg/sweep/logs/experiment.out
 #SBATCH -e <your.slurm.home.path>/TReconLM/src/slurm_pkg/sweep/logs/experiment.err
+
+# W&B hyperparameter sweep: creates a new sweep or resumes an existing one.
+# Usage:
+#   sbatch wandb_sweep.sh                    # create a new sweep
+#   sbatch wandb_sweep.sh <sweep_id>         # resume an existing sweep
+
+RESUME_SWEEP_ID="${1:-}"
 
 NODE=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)
 echo "Primary node: $NODE"
@@ -25,13 +32,20 @@ bash -c '
 
   python -m pip install -q --upgrade wandb pyyaml transformers torchmetrics einops
 
-  # W&B credentials 
-  export WANDB_API_KEY=<your.wandb.api.key>8
+  # W&B credentials
+  export WANDB_API_KEY=<your.wandb.api.key>
   export WANDB_PROJECT=MicrosoftFinetune
   export WANDB_ENTITY=<your.wandb.entity>
 
-  # create sweep, capture ID (Python SDK, silent) ───────────────
-  SWEEP_ID=$(python - <<'"'"'PY'"'"'
+  RESUME_ID="'"$RESUME_SWEEP_ID"'"
+
+  if [ -n "$RESUME_ID" ]; then
+    # Resume existing sweep
+    SWEEP_ID="$RESUME_ID"
+    echo "Resuming sweep: $SWEEP_ID"
+  else
+    # Create new sweep
+    SWEEP_ID=$(python - <<'"'"'PY'"'"'
 import os, yaml, wandb, contextlib, io
 with open("/TReconLM/src/hydra/train_config/sweeps/sweep.yaml") as f:
     cfg = yaml.safe_load(f)
@@ -43,23 +57,25 @@ with contextlib.redirect_stdout(buf):
 print(sid)
 PY
 )
-  [ -z "$SWEEP_ID" ] && { echo "Sweep creation failed"; exit 1; }
+    [ -z "$SWEEP_ID" ] && { echo "Sweep creation failed"; exit 1; }
+    echo "Created new sweep: $SWEEP_ID"
+  fi
 
   export SWEEP_PATH="$WANDB_ENTITY/$WANDB_PROJECT/$SWEEP_ID"
-  echo "Sweep path $SWEEP_PATH"
+  echo "Sweep path: $SWEEP_PATH"
 
-  # split CUDA_VISIBLE_DEVICES 
+  # split CUDA_VISIBLE_DEVICES
   IFS=, read -r -a DEV_ARRAY <<< "$CUDA_VISIBLE_DEVICES"
   NUM_DEVS=${#DEV_ARRAY[@]}
   echo "Container sees $NUM_DEVS GPU(s)/slice(s): ${DEV_ARRAY[*]}"
 
-  # launch that many agents, one per device 
+  # launch that many agents, one per device
   for IDX in "${!DEV_ARRAY[@]}"; do
     (
-      export CUDA_VISIBLE_DEVICES=${DEV_ARRAY[$IDX]}          
-      export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512    
+      export CUDA_VISIBLE_DEVICES=${DEV_ARRAY[$IDX]}
+      export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
       echo "Agent $((IDX+1)) on $CUDA_VISIBLE_DEVICES"
-      python -m wandb agent --count 30 "$SWEEP_PATH" # count meaning run up to 30 agents
+      python -m wandb agent --count 30 "$SWEEP_PATH"
     ) &
   done
 

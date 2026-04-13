@@ -1,9 +1,34 @@
+"""Insertion-Deletion-Substitution (IDS) channel simulation.
+
+Provides functions to corrupt a ground truth DNA sequence with insertions,
+deletions, and substitutions at configurable probabilities. Two main entry points:
+
+  - IDS_channel:           corrupts a sequence once, returns a single noisy copy
+                           (used for CPRED targets, called in a loop)
+  - IDS_alignment_channel: corrupts a sequence `observation_size` times and aligns
+                           all noisy copies together so they have equal length
+                           (used for MSA/NESTED targets)
+
+Helper functions:
+  - generate_insertion_pattern / generate_alignment_pattern:
+        pad alignment sequences so all reads have the same length (like columns
+        lining up in a multiple sequence alignment)
+  - generate_alignment / replace_I:
+        replace placeholder 'I' characters with actual random nucleotides (A/C/G/T)
+
+Standalone usage (quick demo, prints ground truth + noisy copies):
+    python -m src.data_pkg.IDS_channel
+
+    Generates a random 10nt sequence, corrupts it with 10% insertion/deletion/
+    substitution probability, and prints the ground truth alongside the noisy
+    observation. Change target_type in __main__ to 'std_MSA' to see alignment
+    output instead.
+"""
+
 import numpy as np
 import random
 from ..utils.data_functions import filter_string
-from ..utils.helper_functions import compute_homopolymer_map, weighted_choice
-import sys
-import json
+from ..utils.helper_functions import weighted_choice
 
 def generate_insertion_pattern(n):
     """
@@ -90,18 +115,19 @@ def generate_alignment_pattern(sequences):
         i += 1
     return alignment_pattern
 
-def generate_alignment(alignment_pattern):
+def generate_alignment(alignment_pattern, rng=None):
     """
     Takes an alignment_pattern and translates special alignment symbols like 'I' and 'D' into real characters or gaps.
     """
 
+    rng = rng or random
     alphabet = ['A', 'C', 'G', 'T']
 
     for index, seq in enumerate(alignment_pattern):
         seq = list(seq)
         for i in range(len(seq)):
             if seq[i] == 'I':
-                seq[i] = random.choice(alphabet)
+                seq[i] = rng.choice(alphabet)
             if seq[i] == 'D':
                 seq[i] = '-'
         alignment_pattern[index] = ''.join(seq)
@@ -219,7 +245,7 @@ def IDS_alignment_channel(ground_truth_sequence, channel_statistics, observation
     alignment_list = generate_alignment_pattern(alignment_list)
     
     if 'std' in target_type:
-        alignment_list = generate_alignment(alignment_list) # inserts a random base for I
+        alignment_list = generate_alignment(alignment_list, rng=rng) # inserts a random base for I
     
         for index, (obs, alg) in enumerate(zip(observation_list, alignment_list)):
 
@@ -321,6 +347,10 @@ def IDS_channel(x, channel_statistics, rng):
 
     return y
 
+
+################################################################################
+# Error model IDS channel (not used for results in the paper)
+################################################################################
 
 def _sample_burst_length(burst_weight_entry, rng):
     """Sample a burst length from the learned distribution.
@@ -560,42 +590,34 @@ def error_model_IDS_channel(x, n_sub, n_del, n_ins, error_model, homopolymer_map
 
 if __name__ == '__main__':
 
-    #random.seed(42)
-    #np.random.seed(42)
-
-    test_size = int(1e0)
-    test_size = 1
+    rng = random.Random(42)
 
     length_ground_truth = 10
     observation_size = 5
-    print_flag = False
     channel_statistics = {'substitution_probability': 0.1, 'deletion_probability': 0.1, 'insertion_probability': 0.1}
-
-    ham_arr = np.zeros(test_size)
-    lev_arr = np.zeros(test_size)
 
     target_type = 'CPRED'
 
     if target_type == 'CPRED':
-
-        observation_list = []
-        ground_truth_sequence = ''.join(random.choices('ACTG', k=length_ground_truth))
-        print(ground_truth_sequence)
+        ground_truth_sequence = ''.join(rng.choices('ACTG', k=length_ground_truth))
+        print(f'Ground truth: {ground_truth_sequence}')
         print('##################################################')
 
-        for i in range(test_size):
-            obs_seq = IDS_channel(ground_truth_sequence, channel_statistics)
-            print(ground_truth_sequence)
-            print(obs_seq)
-            observation_list.append(obs_seq)    
-        
-        print('------------------------------------------------------------')
-        print('------------------------------------------------------------')
-        
+        obs_seq = IDS_channel(ground_truth_sequence, channel_statistics, rng)
+        print(f'Noisy copy:   {obs_seq}')
+
     else:
-        
-        for i in range(test_size):
-            ground_truth_sequence = ''.join(random.choices('ACTG', k=length_ground_truth))
-            observation_list, alignment = IDS_alignment_channel(ground_truth_sequence = ground_truth_sequence, channel_statistics = channel_statistics,
-                                               observation_size = observation_size,
-                                                target_type =  target_type, print_flag = False)
+        ground_truth_sequence = ''.join(rng.choices('ACTG', k=length_ground_truth))
+        print(f'Ground truth: {ground_truth_sequence}')
+        print('##################################################')
+
+        observation_list, alignment = IDS_alignment_channel(
+            ground_truth_sequence=ground_truth_sequence,
+            channel_statistics=channel_statistics,
+            observation_size=observation_size,
+            target_type=target_type,
+            rng=rng,
+        )
+        for i, (obs, alg) in enumerate(zip(observation_list, alignment)):
+            print(f'Read {i}: {obs}')
+            print(f'Align {i}: {alg}')

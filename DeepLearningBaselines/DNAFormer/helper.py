@@ -595,7 +595,14 @@ def evaluate_and_log(results, out_dir, log_to_wandb=True):
                 h_array.mean(), h_array.std(), h_array.min(), h_array.max(),
                 l_array.mean(), l_array.std(), l_array.min(), l_array.max()
             ])
-            print(f"Cluster size: {N}, lev average: {l_array.mean()}")
+            l_failures = l_array[l_array > 0]
+            if l_failures.size:
+                print(f"Cluster size: {N}, lev average: {l_array.mean():.6f} ± {l_array.std():.6f}, "
+                      f"failure rate: {1 - succ:.4f}, "
+                      f"lev on failures: {l_failures.mean():.6f} ± {l_failures.std():.6f}")
+            else:
+                print(f"Cluster size: {N}, lev average: {l_array.mean():.6f} ± {l_array.std():.6f}, "
+                      f"failure rate: {1 - succ:.4f}")
 
         # overall “all” row
         all_h = np.concatenate(list(h_vals.values())) if h_vals else np.array([])
@@ -646,5 +653,13 @@ def evaluate_and_log(results, out_dir, log_to_wandb=True):
             "std_time_per_example": inf_std,
         })
 
+    # Print overall summary
+    print(f"Overall: lev average: {all_l.mean() if all_l.size else 0.0:.6f} ± {all_l.std() if all_l.size else 0.0:.6f}, "
+          f"success rate: {all_succ:.4f}, failure rate: {all_fail:.4f}")
+    if all_l.size:
+        all_l_failures = all_l[all_l > 0]
+        if all_l_failures.size:
+            print(f"  Failures only: lev average: {all_l_failures.mean():.6f} ± {all_l_failures.std():.6f} "
+                  f"(n={all_l_failures.size})")
     print(f"Written detailed results to {out_dir}")
 

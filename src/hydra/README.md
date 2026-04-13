@@ -288,6 +288,9 @@ model:
     max_new_tokens: ${data.ground_truth_length}
     constrained_generation: false     # Constrain output to ACTG only
 
+    # Subsample test set (null = use all examples)
+    max_samples: null                 # Randomly sample N examples; null = full dataset
+
     # Beam search (if strategy: beam_search)
     # beam_width: 6
 

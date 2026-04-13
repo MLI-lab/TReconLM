@@ -10,7 +10,6 @@ class LSTMConfig:
 
 class LSTMConsensus(nn.Module):
     """
-    Unidirectional L‑STM that mimics GPT’s forward() signature:
         logits: (B, T, vocab)
         loss  : scalar x‑entropy against targets (shifted inside this module)
     """

@@ -5,6 +5,7 @@ torchvision==0.16.0
 # Other dependencies
 tensorboard
 pytest
+nox
 scipy==1.11.4
 imageio
 numpy<2.0

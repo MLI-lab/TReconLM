@@ -21,64 +21,64 @@ def get_model_info(sequence_length, variant='pretrained'):
         60: {
             'pretrained': {
                 'model_name': 'model_seq_len_60.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 800,
                 'description': 'Pretrained on synthetic IDS data (60nt)',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L60_ctx800_ds50000'
             },
             'noisy_dna': {
                 'model_name': 'finetuned_noisy_dna_len60.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 800,
                 'description': 'Fine-tuned on Noisy DNA dataset (60nt)',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L60_ctx800_ds50000'
             }
         },
         110: {
             'pretrained': {
                 'model_name': 'model_seq_len_110.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 1500,
                 'description': 'Pretrained on synthetic IDS data (110nt)',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L110_ctx1500_ds50000'
             },
             'microsoft': {
                 'model_name': 'finetuned_microsoft_dna_len110.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 1500,
                 'description': 'Fine-tuned on Microsoft DNA dataset (110nt)',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L110_ctx1500_ds50000'
             }
         },
         117: {
             'pretrained': {
                 'model_name': 'model_seq_len_110.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 1500,
                 'description': 'Pretrained on synthetic IDS data (110nt) - closest to 117nt',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L110_ctx1500_ds50000'
             },
             'chandak': {
                 'model_name': 'finetuned_chandak_len117.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 1500,
                 'description': 'Fine-tuned on Chandak dataset (117nt)',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L110_ctx1500_ds50000'
             }
         },
         180: {
             'pretrained': {
                 'model_name': 'model_seq_len_180.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 2400,
                 'description': 'Pretrained on synthetic IDS data (180nt)',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L180_ctx2400_ds50000'
             }
         },
@@ -86,10 +86,10 @@ def get_model_info(sequence_length, variant='pretrained'):
         'var_50_120': {
             'pretrained': {
                 'model_name': 'model_var_len_50_120.pt',
-                'repo_id': 'mli-lab/TReconLM',
+                'repo_id': 'tracereconstruction2026/TReconLM',
                 'block_size': 2400,
                 'description': 'Pretrained on variable length sequences (50-120nt). Best for fine-tuning on custom real-world data.',
-                'dataset_repo_id': 'mli-lab/TReconLM_datasets',
+                'dataset_repo_id': 'tracereconstruction2026/TReconLM_datasets',
                 'dataset': 'L110_ctx1500_ds50000'
             }
         }

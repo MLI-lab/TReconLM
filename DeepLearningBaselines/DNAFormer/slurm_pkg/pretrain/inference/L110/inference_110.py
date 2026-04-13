@@ -35,7 +35,7 @@ class config:
     sweep= False 
     misclustering = False
     #max_samples = None
-    timing= True
+    timing= False
 
     #####################################################################
     # DNAFormer parameters
@@ -95,15 +95,15 @@ class config:
     data_path       = None
 
     ################################### Loading best model & Artifact for inference #####################
-    pretrained_path= ''  # set to your model checkpoint path
+    pretrained_path= '/mnt/model_checkpoints/model_checkpoints_DNAFormer/DNAFormer_run_20250629_031752_gt110/checkpoint_best_val_loss.pt'  # set to your model checkpoint path
     load_wandb = True  # or False
     test_artifact_name = "test_dataset_seed34721_gl110_bs1500_ds50000"
     download_dir = "./artifact_data/"
-    entity = ""  # your wandb username or team name
+    entity = "<your.wandb.entity>"  # your wandb username or team name
     test_project = "TRACE_RECONSTRUCTION"
     wandb_log = True
-    project = "TimingCost"
-    out_dir= ''  # set to your output directory
+    project = "TestDNAformer"
+    out_dir= './output'  # set to your output directory
     val_dataset_size=1 # dummy
     num_workers=1
 

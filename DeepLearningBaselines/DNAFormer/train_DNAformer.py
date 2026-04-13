@@ -330,7 +330,7 @@ def run_train_ddp(config, model):
         optimizer.zero_grad(set_to_none=True)
 
         # Forward + backward 
-        if len(profiled_flops) < 2:
+        if len(profiled_flops) < 7:
             with profile(
                 activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                 record_shapes=True,

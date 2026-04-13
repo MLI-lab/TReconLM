@@ -25,7 +25,6 @@ logs/
 **/exclude_git/
 **/downloaded_artifact/
 **/downloaded_artifact_openai/
-CLAUDE.md
 models/
 tutorial/data/
 tutorial/models/
@@ -38,7 +37,6 @@ __pycache__/
 artifacts/
 DeepLearningBaselines/RobuSeqNet/examples/artifacts/
 
-# (optional) if you only want to ignore large tensors inside artifacts:
 # artifacts/**/*.pt
 # DeepLearningBaselines/RobuSeqNet/examples/artifacts/**/*.pt
 artifacts/
@@ -82,8 +80,10 @@ data/chandak/nanopore_dna_storage_data/
 shuffle_robustness_results/
 
 # --------------------------- DNAFormer data files -----------------------
-data/dnaformer/*.txt
-data/dnaformer/without_index_data/
+data/dnaformer/
+
+# --------------------------- NoisyDNA data storage ----------------------
+data/noisy_dna/noisy_dna_data_storage/
 
 # --------------------------- Error model results ------------------------
 data/error_model/microsoft/
