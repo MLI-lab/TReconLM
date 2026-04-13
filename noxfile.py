@@ -5,7 +5,7 @@ import nox
 IN_CONTAINER = os.path.exists("/.dockerenv") or os.environ.get("CONTAINER", "") != ""
 
 
-@nox.session(python=False if IN_CONTAINER else "3.11")
+@nox.session(python=False)
 def tests(session):
     """Run the full test suite.
 
@@ -13,5 +13,5 @@ def tests(session):
     - Local: creates an isolated virtualenv and installs from requirements.txt.
     """
     if not IN_CONTAINER:
-        session.install("-r", "requirements.txt")
+        session.run("pip", "install", "-r", "requirements.txt")
     session.run("pytest", "tests/", "-v", "--tb=short")
