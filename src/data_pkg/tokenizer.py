@@ -118,6 +118,6 @@ def encode_and_pad(data_list, name, stoi, block_size, out_dir):
 
 if __name__ == "__main__":
 
-    print('prepare.py')
+    print('tokenizer.py')
 
     initialize('nuc')

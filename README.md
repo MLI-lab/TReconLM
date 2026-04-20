@@ -6,30 +6,37 @@ TReconLM is a decoder-only transformer model for trace reconstruction of noisy D
 
 ## Installation
 
-Tested on `Ubuntu 22.04.4 LTS`.  
-Uses **PyTorch 2.1.0** with **CUDA 12.1**. To change the version, update the `FROM` image in `.devcontainer/Dockerfile` and the `torch`/`torchvision`/`cudatoolkit`/`--extra-index-url` entries in `treconlm.yml`. Compatible versions for your CUDA can be found [here](https://pytorch.org/get-started/previous-versions/).
+Tested on `Ubuntu 22.04.4 LTS` with **PyTorch 2.1.0** and **CUDA 12.1**.
 
-Create the conda environment:
+### Option 1: Local setup
 
-```bash
-conda env create -f treconlm.yml
-```
+1. Create the conda environment:
+   ```bash
+   conda env create -f treconlm.yml
+   ```
+2. Install build tools (needed to compile extensions):
+   ```bash
+   sudo apt update && sudo apt install -y build-essential
+   ```
+3. Add the project to your Python path:
+   ```bash
+   export PYTHONPATH="${PYTHONPATH}:/path/to/treconlm"
+   ```
 
-Install `build-essential` (required for compiling extensions):
+### Option 2: Dev Container (VS Code)
 
-```bash
-sudo apt update && sudo apt install -y build-essential
-```
+Open the project in VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers). It builds and starts a Docker container with all dependencies pre-installed from `.devcontainer/devcontainer.json`.
 
-Set the Python path:
+> **Note:** You may need to adjust `mounts` and `runArgs` in `.devcontainer/devcontainer.json` for your machine (memory, CPUs, extra bind mounts).
 
-```bash
-export PYTHONPATH="${PYTHONPATH}:/path/to/treconlm"
-```
+### Changing PyTorch / CUDA versions
 
-Alternatively, skip the above steps and open the project in a Dev Container using VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers). This will automatically build and start a Docker container with all dependencies pre-installed using `.devcontainer/devcontainer.json`.
+To use a different PyTorch / CUDA version:
 
-> **Note:** The `mounts` and `runArgs` in `.devcontainer/devcontainer.json` may need to be adjusted for your machine (e.g., available memory, CPUs, or additional bind mounts).
+- **Local setup:** update the `torch` / `torchvision` / `cudatoolkit` / `--extra-index-url` entries in `treconlm.yml`.
+- **Dev Container:** update the `FROM` image in `.devcontainer/Dockerfile`.
+
+See [PyTorch previous versions](https://pytorch.org/get-started/previous-versions/) for compatible combinations.
 
 ---
 
@@ -45,7 +52,7 @@ Pretrained and fine-tuned models, as well as synthetic test datasets, are availa
 Start with the tutorial notebooks in `tutorial/`:
 
 - [`quick_start.ipynb`](tutorial/quick_start.ipynb): Download models from HuggingFace and run inference on synthetic datasets
-- [`custom_data.ipynb`](tutorial/custom_data.ipynb): Run inference on your own data or use the Microsoft/Noisy DNA datasets
+- [`custom_data.ipynb`](tutorial/custom_data.ipynb): Run inference on your own data or use the Microsoft/Noisy/Chandak DNA datasets
 
 ### Command-Line Inference
 
@@ -115,6 +122,12 @@ To fine-tune on real datasets, use experiments like `microsoft/mic` or `noisyDNA
 
 Example cluster scripts can be found in `src/slurm_pkg/`.
 
+> **Note:** If you get `ImportError: ... GLIBCXX_3.4.29 not found` (scipy/torchmetrics), your system's `libstdc++` is too old. Install conda's version into the env:
+>
+> ```bash
+> conda install -c conda-forge "libstdcxx-ng>=12"
+> ```
+
 ---
 
 ## Example Training Times
@@ -180,9 +193,12 @@ These contain example SLURM execution scripts.
 
 ## Tests
 
-Run the test suite with [nox](https://nox.thirdparty.dev):
+Requires Python 3.11. Create a fresh environment and run the test suite with [nox](https://nox.thirdparty.dev):
 
 ```bash
+conda create -n treconlm python=3.11 -y
+conda activate treconlm
+pip install nox
 nox
 ```
 
