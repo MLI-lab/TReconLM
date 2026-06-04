@@ -3,6 +3,10 @@
 TReconLM is a decoder-only transformer model for trace reconstruction of noisy DNA sequences. It is trained to reconstruct a ground-truth sequence from multiple noisy copies (traces), each independently corrupted by insertions, deletions, and substitutions.  
 
 ---
+## Models and data
+
+Pretrained models and synthetic data are available on Hugging Face:
+https://huggingface.co/tracereconstruction2026/TReconLM
 
 ## Installation
 
